@@ -33,10 +33,12 @@ def _set_cached(key: str, data):
 
 def clear_cache():
     """전체 캐시 초기화."""
-    global _mapping_cache, _mapping_index_cache
+    global _mapping_cache, _mapping_index_cache, _project_cache, _project_cache_ts
     _cache.clear()
     _mapping_cache = None
     _mapping_index_cache = None
+    _project_cache = None
+    _project_cache_ts = 0
 
 
 def get_cache_status() -> dict:
@@ -57,8 +59,56 @@ def get_cache_status() -> dict:
 
 # ── Azure SQL 쿼리 ─────────────────────────────────
 
+def _load_from_pg_cache() -> list[dict] | None:
+    """PostgreSQL actual_cache에서 로드 (즉시 응답용)."""
+    try:
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        rows = db.execute(
+            __import__("sqlalchemy").text("SELECT project_code, empno, activity_code_1, activity_name_1, activity_code_2, activity_name_2, activity_code_3, activity_name_3, use_time FROM actual_cache")
+        ).fetchall()
+        db.close()
+        if not rows:
+            return None
+        result = []
+        for r in rows:
+            result.append({
+                "project_code": r[0], "empno": r[1], "use_time": float(r[8] or 0),
+                "activity_code_1": r[2] or "", "activity_name_1": r[3] or "",
+                "activity_code_2": r[4] or "", "activity_name_2": r[5] or "",
+                "activity_code_3": r[6] or "", "activity_name_3": r[7] or "",
+            })
+        logger.info(f"Loaded {len(result)} rows from PG actual_cache")
+        return result
+    except Exception as e:
+        logger.warning(f"PG actual_cache load failed: {e}")
+        return None
+
+
+def _save_to_pg_cache(rows: list[dict]):
+    """Azure 데이터를 PostgreSQL actual_cache에 저장."""
+    try:
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        db.execute(__import__("sqlalchemy").text("TRUNCATE actual_cache"))
+        if rows:
+            from sqlalchemy import text
+            for r in rows:
+                db.execute(text(
+                    "INSERT INTO actual_cache (project_code, empno, activity_code_1, activity_name_1, activity_code_2, activity_name_2, activity_code_3, activity_name_3, use_time) VALUES (:pc, :emp, :ac1, :an1, :ac2, :an2, :ac3, :an3, :ut)"
+                ), {"pc": r["project_code"], "emp": r["empno"], "ut": r["use_time"],
+                    "ac1": r["activity_code_1"], "an1": r["activity_name_1"],
+                    "ac2": r["activity_code_2"], "an2": r["activity_name_2"],
+                    "ac3": r["activity_code_3"], "an3": r["activity_name_3"]})
+        db.commit()
+        db.close()
+        logger.info(f"Saved {len(rows)} rows to PG actual_cache")
+    except Exception as e:
+        logger.warning(f"PG actual_cache save failed: {e}")
+
+
 def _fetch_all_tms_rows() -> list[dict]:
-    """Azure에서 전체 TMS 데이터 조회 (SQL 레벨 집계 + 캐시).
+    """TMS 데이터 조회 (메모리 캐시 → PG 캐시 → Azure SQL 순).
 
     모든 프로젝트를 한번에 가져와서 캐시. 이후 project_codes로 필터.
     Lock으로 동시 요청 시 중복 fetch 방지.
@@ -67,6 +117,12 @@ def _fetch_all_tms_rows() -> list[dict]:
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
+
+    # PG 캐시에서 로드 (서버 재시작 시 즉시 응답)
+    pg_cached = _load_from_pg_cache()
+    if pg_cached:
+        _set_cached(cache_key, pg_cached)
+        return pg_cached
 
     with _fetch_lock:
         # 락 획득 후 다시 확인 (다른 스레드가 이미 채웠을 수 있음)
@@ -121,6 +177,10 @@ def _fetch_all_tms_rows() -> list[dict]:
         logger.info(f"Azure TMS fetch: {len(result)} rows in {elapsed:.2f}s (all projects, aggregated)")
 
         _set_cached(cache_key, result)
+
+        # PG 캐시에도 저장 (다음 서버 시작 시 즉시 사용)
+        threading.Thread(target=_save_to_pg_cache, args=(result,), daemon=True).start()
+
         return result
 
 
@@ -552,3 +612,75 @@ def get_teams() -> list[dict]:
     ]
     _set_cached(cache_key, result)
     return result
+
+
+# ── 프로젝트 검색 (Azure) ─────────────────────────
+
+_project_cache: list[dict] | None = None
+_project_cache_ts: float = 0
+_PROJECT_CACHE_TTL = 3600  # 1시간
+
+
+def _ensure_project_cache():
+    """Azure에서 진행 중 Assurance 프로젝트 목록을 캐싱."""
+    global _project_cache, _project_cache_ts
+    if _project_cache is not None and (time.time() - _project_cache_ts) < _PROJECT_CACHE_TTL:
+        return
+    try:
+        from app.db.azure_session import get_azure_connection
+        with get_azure_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT PRJTCD, PRJTNM, CLIENTNM, SHRTNM,
+                       CHARGPTR, PTRNM, PTRORGNM,
+                       CHARGMGR, MGRNM,
+                       CHARGBON, INDUNM
+                FROM BI_STAFFREPORT_PRJT_V
+                WHERE CLOSDV = N'진행' AND LOS = '10'
+            """)
+            cols = [c[0] for c in cursor.description]
+            rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
+        _project_cache = [
+            {
+                "project_code": r.get("PRJTCD", ""),
+                "project_name": r.get("PRJTNM", ""),
+                "client_name": r.get("CLIENTNM", "") or r.get("SHRTNM", "") or "",
+                "el_empno": r.get("CHARGPTR", "") or "",
+                "el_name": r.get("PTRNM", "") or "",
+                "pm_empno": r.get("CHARGMGR", "") or "",
+                "pm_name": r.get("MGRNM", "") or "",
+                "department": r.get("PTRORGNM", "") or r.get("CHARGBON", "") or "",
+                "industry": r.get("INDUNM", "") or "",
+            }
+            for r in rows
+        ]
+        _project_cache_ts = time.time()
+        logger.info(f"Azure project cache loaded: {len(_project_cache)} projects")
+    except Exception as e:
+        logger.error(f"Azure project cache load failed: {e}")
+        if _project_cache is None:
+            _project_cache = []
+
+
+def search_azure_projects(q: str, limit: int = 50, client_code_prefix: str = "") -> list[dict]:
+    """Azure 캐시에서 프로젝트 검색. client_code_prefix가 있으면 코드 앞자리 필터."""
+    _ensure_project_cache()
+    pool = _project_cache or []
+
+    # client_code_prefix로 먼저 필터
+    if client_code_prefix:
+        prefix = client_code_prefix[:5]
+        pool = [p for p in pool if (p["project_code"] or "").startswith(prefix)]
+
+    if not q:
+        return pool[:limit]
+    q_lower = q.lower()
+    results = []
+    for p in pool:
+        if (q_lower in (p["project_code"] or "").lower() or
+                q_lower in (p["project_name"] or "").lower() or
+                q_lower in (p["client_name"] or "").lower()):
+            results.append(p)
+            if len(results) >= limit:
+                break
+    return results

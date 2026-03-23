@@ -1,13 +1,17 @@
 import time
 import logging
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func as sa_func
 from typing import Optional
 
 from app.db.session import get_db
 from app.models.project import Project
+from app.models.budget import BudgetDetail
 from app.services.budget_service import get_overview_data
+from app.services import azure_service
 from app.api.deps import get_optional_user, get_user_project_codes
 
 logger = logging.getLogger(__name__)
@@ -45,6 +49,129 @@ def get_overview(
 
     logger.info(f"GET /overview total: {time.time()-t0:.2f}s")
     return result
+
+
+@router.get("/overview-person")
+def get_person_overview(
+    project_code: Optional[str] = Query(None),
+    budget_category: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """인별 Overview — 로그인 사용자의 Staff 시간 기준."""
+    t0 = time.time()
+
+    if not user:
+        return {"projects": [], "budget_by_category": [], "budget_by_unit": [],
+                "kpi": {"budget_total": 0, "actual_total": 0, "progress": 0}}
+
+    empno = user["empno"]
+
+    # 1) 이 사용자가 배정된 프로젝트별 budget
+    budget_query = db.query(
+        BudgetDetail.project_code,
+        BudgetDetail.budget_category,
+        BudgetDetail.budget_unit,
+        sa_func.sum(BudgetDetail.budget_hours).label("budget"),
+    ).filter(BudgetDetail.empno == empno)
+
+    if project_code:
+        budget_query = budget_query.filter(BudgetDetail.project_code == project_code)
+    if budget_category:
+        budget_query = budget_query.filter(BudgetDetail.budget_category == budget_category)
+
+    budget_rows = budget_query.group_by(
+        BudgetDetail.project_code, BudgetDetail.budget_category, BudgetDetail.budget_unit
+    ).all()
+
+    # 프로젝트별 budget 합계
+    project_budgets: dict[str, float] = defaultdict(float)
+    category_budgets: dict[str, float] = defaultdict(float)
+    unit_budgets: dict[str, float] = defaultdict(float)
+    unit_category_map: dict[str, str] = {}
+    for r in budget_rows:
+        project_budgets[r.project_code] += float(r.budget)
+        category_budgets[r.budget_category or "기타"] += float(r.budget)
+        unit_budgets[r.budget_unit or "기타"] += float(r.budget)
+        if r.budget_unit:
+            unit_category_map[r.budget_unit] = r.budget_category or "기타"
+
+    all_project_codes = list(project_budgets.keys())
+
+    # 2) Actual — Azure TMS에서 해당 empno의 시간
+    actual_by_project: dict[str, float] = defaultdict(float)
+    actual_by_category: dict[str, float] = defaultdict(float)
+    actual_by_unit: dict[str, float] = defaultdict(float)
+
+    if all_project_codes:
+        actual_detail = azure_service.get_actual_by_empno_project_unit(
+            empno, all_project_codes, db
+        )
+        for (pc, unit), hours in actual_detail.items():
+            actual_by_project[pc] += hours
+            actual_by_unit[unit] += hours
+
+        for (pc, unit), hours in actual_detail.items():
+            cat = unit_category_map.get(unit, "기타")
+            actual_by_category[cat] += hours
+
+    # 3) 프로젝트 정보
+    project_info = {}
+    if all_project_codes:
+        for p in db.query(Project).filter(Project.project_code.in_(all_project_codes)).all():
+            project_info[p.project_code] = p
+
+    # 4) Build response
+    projects = []
+    for pc in sorted(all_project_codes, key=lambda c: project_budgets[c], reverse=True):
+        prj = project_info.get(pc)
+        b = project_budgets[pc]
+        a = actual_by_project.get(pc, 0)
+        projects.append({
+            "project_code": pc,
+            "project_name": prj.project_name if prj else pc,
+            "el_name": prj.el_name if prj else "",
+            "pm_name": prj.pm_name if prj else "",
+            "budget": b,
+            "actual": a,
+            "progress": round(a / b * 100, 1) if b else 0,
+        })
+
+    budget_by_category = [
+        {"name": cat, "value": budget, "actual": actual_by_category.get(cat, 0)}
+        for cat, budget in sorted(category_budgets.items(), key=lambda x: -x[1])
+    ]
+
+    budget_by_unit = sorted(
+        [
+            {"unit": unit, "category": unit_category_map.get(unit, "기타"),
+             "budget": budget, "actual": actual_by_unit.get(unit, 0),
+             "progress": round(actual_by_unit.get(unit, 0) / budget * 100, 1) if budget else 0}
+            for unit, budget in unit_budgets.items()
+        ] + [
+            {"unit": unit, "category": "기타",
+             "budget": 0, "actual": actual, "progress": 0}
+            for unit, actual in actual_by_unit.items()
+            if unit not in unit_budgets and actual > 0
+        ],
+        key=lambda x: (x["category"], -x["budget"]),
+    )
+
+    total_budget = sum(project_budgets.values())
+    total_actual = sum(actual_by_project.values())
+
+    logger.info(f"GET /overview-person total: {time.time()-t0:.2f}s")
+
+    return {
+        "kpi": {
+            "budget_total": total_budget,
+            "actual_total": total_actual,
+            "progress": round(total_actual / total_budget * 100, 1) if total_budget else 0,
+        },
+        "projects": projects,
+        "budget_by_category": budget_by_category,
+        "budget_by_unit": budget_by_unit,
+    }
 
 
 @router.get("/filter-options")

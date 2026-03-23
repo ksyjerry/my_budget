@@ -219,6 +219,7 @@ def _parse_project_db(wb) -> list[dict]:
             continue
         projects.append({
             "project_code": str(row[0]),
+            "client_code": str(row[0]).split("-")[0],
             "client_name": row[1],
             "project_name": row[2],
             "industry": row[3],
@@ -237,13 +238,21 @@ def _parse_project_db(wb) -> list[dict]:
             "template_status": row[16],
             "el_empno": str(row[17] or ""),
             "pm_empno": str(row[18] or ""),
+            "qrp_empno": str(row[19] or ""),
+            "qrp_name": str(row[20] or ""),
             "group_code": str(row[21] or ""),
             "contract_hours": row[22] or 0,
+            "qrp_hours": row[23] or 0,
+            "rm_hours": row[24] or 0,
+            "el_hours": row[25] or 0,
+            "pm_hours": row[26] or 0,
+            "ra_elpm_hours": row[27] or 0,
             "axdx_hours": row[28] or 0,
             "et_controllable_budget": row[29] or 0,
             "fulcrum_hours": row[30] or 0,
             "ra_staff_hours": row[31] or 0,
             "specialist_hours": row[32] or 0,
+            "travel_hours": row[33] or 0,
             "total_budget_hours": row[37] or 0,
         })
     return projects

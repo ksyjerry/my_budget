@@ -54,8 +54,14 @@ def _process_budget_db(file_path: str, db: Session):
     parsed = parse_budget_db_file(file_path)
 
     project_count = 0
+    # Client기본정보 시트 → projects
     for client_data in parsed["clients"]:
         upsert_project_from_client_data(db, client_data)
+        project_count += 1
+
+    # Project기본정보 시트 → Client기본정보에 없는 프로젝트 추가 등록
+    for proj_data in parsed.get("projects", []):
+        upsert_project_from_client_data(db, proj_data)
         project_count += 1
 
     # 개인별 Budget 데이터를 프로젝트별로 그룹핑하여 삽입

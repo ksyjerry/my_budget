@@ -67,6 +67,10 @@ def list_assignments(
     if department:
         query = query.filter(BudgetDetail.department == department)
 
+    # 지원 구성원 카테고리 제외 (실제 인원 아님)
+    NON_PERSON = {"Fulcrum", "RA", "Specialist", "TBD"}
+    query = query.filter(~BudgetDetail.empno.in_(NON_PERSON))
+
     results = query.order_by(func.sum(BudgetDetail.budget_hours).desc()).all()
 
     return [
@@ -156,20 +160,46 @@ def get_assignment_detail(
         "department": emp_info.department if emp_info else "",
         "grade": emp_info.grade if emp_info else "",
         "projects": projects_summary,
-        "details": [
-            {
-                "project_code": r.project_code,
-                "project_name": project_info_map[r.project_code].project_name
-                    if r.project_code in project_info_map else "",
-                "budget_unit": r.budget_unit,
-                "budget_category": r.budget_category,
-                "budget": float(r.budget),
-                "actual": actual_map.get((r.project_code, r.budget_unit), 0),
-                "remaining": float(r.budget) - actual_map.get((r.project_code, r.budget_unit), 0),
-                "progress": round(
-                    actual_map.get((r.project_code, r.budget_unit), 0) / float(r.budget) * 100, 1
-                ) if r.budget else 0,
-            }
-            for r in budget_by_project
-        ],
+        "details": _build_details(budget_by_project, actual_map, project_info_map),
     }
+
+
+def _build_details(budget_by_project, actual_map, project_info_map):
+    """Budget 행 + actual만 있는 행을 병합하여 상세 리스트 생성."""
+    # Budget이 있는 행
+    seen = set()
+    details = []
+    for r in budget_by_project:
+        key = (r.project_code, r.budget_unit)
+        seen.add(key)
+        b = float(r.budget)
+        a = actual_map.get(key, 0)
+        details.append({
+            "project_code": r.project_code,
+            "project_name": project_info_map[r.project_code].project_name
+                if r.project_code in project_info_map else "",
+            "budget_unit": r.budget_unit,
+            "budget_category": r.budget_category or "",
+            "budget": b,
+            "actual": a,
+            "remaining": b - a,
+            "progress": round(a / b * 100, 1) if b else 0,
+        })
+
+    # Actual만 있고 Budget이 없는 행 추가
+    for (pc, unit), a in actual_map.items():
+        if (pc, unit) in seen or a == 0:
+            continue
+        details.append({
+            "project_code": pc,
+            "project_name": project_info_map[pc].project_name
+                if pc in project_info_map else "",
+            "budget_unit": unit,
+            "budget_category": "",
+            "budget": 0,
+            "actual": a,
+            "remaining": -a,
+            "progress": 0,
+        })
+
+    return details

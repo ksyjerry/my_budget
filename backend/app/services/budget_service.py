@@ -168,6 +168,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
     budget_by_project: dict[str, float] = defaultdict(float)
     budget_by_category: dict[str, float] = defaultdict(float)
     budget_by_unit: dict[str, float] = defaultdict(float)
+    unit_category_map: dict[str, str] = {}
     staff_budget: dict[str, dict] = {}  # empno → {info + budget}
 
     for r in budget_rows:
@@ -177,6 +178,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
             budget_by_category[r.budget_category] += hrs
         if r.budget_unit:
             budget_by_unit[r.budget_unit] += hrs
+            unit_category_map[r.budget_unit] = r.budget_category or "기타"
 
         if r.empno:
             if r.empno not in staff_budget:
@@ -302,17 +304,31 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
             for cat, hrs in sorted(budget_by_category.items(), key=lambda x: x[1], reverse=True)
         ],
         "actual_by_category": actual_by_category,
-        "budget_by_unit": [
-            {
-                "unit": unit,
-                "budget": budget,
-                "actual": actual_unit_map.get(unit, 0),
-                "progress": round(
-                    actual_unit_map.get(unit, 0) / budget * 100, 1
-                ) if budget else 0,
-            }
-            for unit, budget in sorted(budget_by_unit.items(), key=lambda x: x[1], reverse=True)
-        ],
+        "budget_by_unit": sorted(
+            [
+                {
+                    "unit": unit,
+                    "category": unit_category_map.get(unit, "기타"),
+                    "budget": budget,
+                    "actual": actual_unit_map.get(unit, 0),
+                    "progress": round(
+                        actual_unit_map.get(unit, 0) / budget * 100, 1
+                    ) if budget else 0,
+                }
+                for unit, budget in budget_by_unit.items()
+            ] + [
+                {
+                    "unit": unit,
+                    "category": "기타",
+                    "budget": 0,
+                    "actual": actual,
+                    "progress": 0,
+                }
+                for unit, actual in actual_unit_map.items()
+                if unit not in budget_by_unit and actual > 0
+            ],
+            key=lambda x: (x["category"], -x["budget"]),
+        ),
         "elpm_qrp_time": elpm_qrp_time,
         "staff_time": staff_time,
     }

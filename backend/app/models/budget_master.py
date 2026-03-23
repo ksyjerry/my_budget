@@ -44,9 +44,22 @@ class ProjectMember(Base):
     role = Column(String(50))  # FLDT 구성원, 지원 ET 구성원
     name = Column(String(100))
     empno = Column(String(20))
+    grade = Column(String(20), default="")
     activity_mapping = Column(String(100))
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class PartnerAccessConfig(Base):
+    """파트너별 데이터 접근 범위 설정."""
+    __tablename__ = "partner_access_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    empno = Column(String(20), nullable=False, unique=True, index=True)
+    emp_name = Column(String(100))
+    scope = Column(String(20), nullable=False, default="self")  # self | departments | all
+    departments = Column(Text, default="")  # comma-separated department names (for scope=departments)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class BudgetChangeLog(Base):

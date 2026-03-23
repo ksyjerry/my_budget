@@ -13,6 +13,7 @@ from app.models.budget_master import (
     ProjectMember, BudgetChangeLog,
 )
 from app.services.budget_service import upsert_project_from_client_data, bulk_insert_budget_details
+from app.api.deps import get_optional_user
 
 router = APIRouter()
 
@@ -69,46 +70,178 @@ def search_employees(q: str = "", db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/projects/search")
-def search_projects(q: str = "", db: Session = Depends(get_db)):
-    """프로젝트 코드 또는 이름으로 검색."""
-    from sqlalchemy.orm import joinedload
-    query = db.query(Project).outerjoin(Client, Project.client_id == Client.id)
+@router.get("/projects/list")
+def list_registered_projects(
+    q: str = "",
+    db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """Budget 등록된 프로젝트 목록 — 로그인 사용자가 EL인 프로젝트만."""
+    from sqlalchemy import func as sa_func
+    query = db.query(Project)
+    if user:
+        query = query.filter(Project.el_empno == user["empno"])
     if q:
         query = query.filter(
             (Project.project_name.ilike(f"%{q}%")) |
             (Project.project_code.ilike(f"%{q}%"))
         )
-    results = query.add_columns(Client.client_code).order_by(Project.project_name).limit(50).all()
-    return [
-        {
+    projects = query.order_by(Project.contract_hours.desc().nullslast()).all()
+    result = []
+    for p in projects:
+        member_count = db.query(sa_func.count(ProjectMember.id)).filter(
+            ProjectMember.project_code == p.project_code).scalar() or 0
+        result.append({
             "project_code": p.project_code,
             "project_name": p.project_name or "",
-            "department": p.department or "",
             "el_name": p.el_name or "",
-            "el_empno": p.el_empno or "",
             "pm_name": p.pm_name or "",
-            "pm_empno": p.pm_empno or "",
-            "qrp_name": p.qrp_name or "",
-            "qrp_empno": p.qrp_empno or "",
             "contract_hours": float(p.contract_hours or 0),
-            "axdx_hours": float(p.axdx_hours or 0),
-            "qrp_hours": float(p.qrp_hours or 0),
-            "rm_hours": float(p.rm_hours or 0),
-            "el_hours": float(p.el_hours or 0),
-            "pm_hours": float(p.pm_hours or 0),
-            "ra_elpm_hours": float(p.ra_elpm_hours or 0),
-            "et_controllable_budget": float(p.et_controllable_budget or 0),
-            "fulcrum_hours": float(p.fulcrum_hours or 0),
-            "ra_staff_hours": float(p.ra_staff_hours or 0),
-            "specialist_hours": float(p.specialist_hours or 0),
-            "travel_hours": float(p.travel_hours or 0),
             "total_budget_hours": float(p.total_budget_hours or 0),
             "template_status": p.template_status or "작성중",
-            "client_code": client_code or "",
+            "member_count": member_count,
+        })
+    return result
+
+
+@router.get("/projects/search")
+def search_projects(q: str = "", client_code: str = "", db: Session = Depends(get_db)):
+    """프로젝트 검색 — Azure DB(회사 전체) + PostgreSQL(Budget 등록 여부) 병합.
+    client_code가 주어지면 해당 클라이언트(프로젝트코드 앞 5자리)에 종속된 프로젝트만 반환.
+    """
+    from app.services import azure_service
+
+    # 1) Azure에서 회사 전체 진행 중 프로젝트 검색
+    #    client_code가 있으면 해당 클라이언트의 프로젝트만 필터
+    azure_results = azure_service.search_azure_projects(
+        q, limit=200, client_code_prefix=client_code
+    )
+
+    # 2) PostgreSQL에서 이미 Budget 등록된 프로젝트 조회
+    registered_codes = set()
+    pg_data: dict[str, dict] = {}
+    if azure_results:
+        codes = [r["project_code"] for r in azure_results]
+        pg_projects = db.query(Project).filter(Project.project_code.in_(codes)).all()
+        for p in pg_projects:
+            registered_codes.add(p.project_code)
+            pg_data[p.project_code] = {
+                "contract_hours": float(p.contract_hours or 0),
+                "axdx_hours": float(p.axdx_hours or 0),
+                "qrp_hours": float(p.qrp_hours or 0),
+                "rm_hours": float(p.rm_hours or 0),
+                "el_hours": float(p.el_hours or 0),
+                "pm_hours": float(p.pm_hours or 0),
+                "ra_elpm_hours": float(p.ra_elpm_hours or 0),
+                "et_controllable_budget": float(p.et_controllable_budget or 0),
+                "fulcrum_hours": float(p.fulcrum_hours or 0),
+                "ra_staff_hours": float(p.ra_staff_hours or 0),
+                "specialist_hours": float(p.specialist_hours or 0),
+                "travel_hours": float(p.travel_hours or 0),
+                "total_budget_hours": float(p.total_budget_hours or 0),
+                "template_status": p.template_status or "작성중",
+                "qrp_name": p.qrp_name or "",
+                "qrp_empno": p.qrp_empno or "",
+            }
+
+    # 3) 병합: Azure 기본정보 + PG Budget 정보
+    return [
+        {
+            "project_code": r["project_code"],
+            "project_name": r["project_name"],
+            "client_name": r["client_name"],
+            "department": r["department"],
+            "el_name": r["el_name"],
+            "el_empno": r["el_empno"],
+            "pm_name": r["pm_name"],
+            "pm_empno": r["pm_empno"],
+            "industry": r["industry"],
+            "is_registered": r["project_code"] in registered_codes,
+            **pg_data.get(r["project_code"], {
+                "contract_hours": 0, "axdx_hours": 0, "qrp_hours": 0,
+                "rm_hours": 0, "el_hours": 0, "pm_hours": 0,
+                "ra_elpm_hours": 0, "et_controllable_budget": 0,
+                "fulcrum_hours": 0, "ra_staff_hours": 0,
+                "specialist_hours": 0, "travel_hours": 0,
+                "total_budget_hours": 0, "template_status": "작성중",
+                "qrp_name": "", "qrp_empno": "",
+            }),
         }
-        for p, client_code in results
+        for r in azure_results
     ]
+
+
+@router.get("/projects/{project_code}/clone-data")
+def get_clone_data(project_code: str, db: Session = Depends(get_db)):
+    """이전 프로젝트 정보 가져오기 — 시간, 구성원, budget template 전체 반환."""
+    from collections import defaultdict
+
+    proj = db.query(Project).filter(Project.project_code == project_code).first()
+    if not proj:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+
+    # 시간 정보
+    hours = {
+        "contract_hours": float(proj.contract_hours or 0),
+        "axdx_hours": float(proj.axdx_hours or 0),
+        "qrp_hours": float(proj.qrp_hours or 0),
+        "rm_hours": float(proj.rm_hours or 0),
+        "el_hours": float(proj.el_hours or 0),
+        "pm_hours": float(proj.pm_hours or 0),
+        "ra_elpm_hours": float(proj.ra_elpm_hours or 0),
+        "et_controllable_budget": float(proj.et_controllable_budget or 0),
+        "fulcrum_hours": float(proj.fulcrum_hours or 0),
+        "ra_staff_hours": float(proj.ra_staff_hours or 0),
+        "specialist_hours": float(proj.specialist_hours or 0),
+        "travel_hours": float(proj.travel_hours or 0),
+        "total_budget_hours": float(proj.total_budget_hours or 0),
+    }
+
+    # 구성원
+    members = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_code == project_code)
+        .order_by(ProjectMember.sort_order)
+        .all()
+    )
+    members_data = [
+        {"role": m.role, "name": m.name, "empno": m.empno, "grade": m.grade or "",
+         "activity_mapping": m.activity_mapping, "sort_order": m.sort_order}
+        for m in members
+    ]
+
+    # Budget template
+    details = (
+        db.query(BudgetDetail)
+        .filter(BudgetDetail.project_code == project_code)
+        .all()
+    )
+    rows_map = defaultdict(lambda: {"months": {}, "meta": {}})
+    for d in details:
+        key = (d.budget_category, d.budget_unit, d.empno)
+        rows_map[key]["meta"] = {
+            "budget_category": d.budget_category,
+            "budget_unit": d.budget_unit,
+            "empno": d.empno,
+            "emp_name": d.emp_name,
+            "grade": d.grade,
+            "department": d.department,
+        }
+        if d.budget_hours and d.budget_hours > 0:
+            rows_map[key]["months"][d.year_month] = d.budget_hours
+    template_rows = []
+    for key, val in rows_map.items():
+        total = sum(val["months"].values())
+        template_rows.append({**val["meta"], "months": val["months"], "total": total})
+
+    return {
+        "project_code": project_code,
+        "project_name": proj.project_name,
+        "hours": hours,
+        "members": members_data,
+        "template": {"rows": template_rows},
+    }
 
 
 # ── Schemas ──────────────────────────────────────────
@@ -156,6 +289,7 @@ class MemberRequest(BaseModel):
     role: str  # "FLDT 구성원" | "지원 ET 구성원"
     name: str
     empno: Optional[str] = ""
+    grade: Optional[str] = ""
     activity_mapping: Optional[str] = "재무제표기말감사"
     sort_order: int = 0
 
@@ -218,6 +352,33 @@ def update_project(project_code: str, req: ProjectCreateRequest, db: Session = D
     db.commit()
 
     return {"message": "프로젝트 수정 완료", "project_code": project.project_code}
+
+
+@router.delete("/projects/{project_code}")
+def delete_project(project_code: str, db: Session = Depends(get_db)):
+    """프로젝트 삭제 (구성원, Budget 데이터 포함)."""
+    proj = db.query(Project).filter(Project.project_code == project_code).first()
+    if not proj:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+
+    # 관련 데이터 삭제
+    db.query(BudgetDetail).filter(BudgetDetail.project_code == project_code).delete()
+    db.query(ProjectMember).filter(ProjectMember.project_code == project_code).delete()
+    db.query(BudgetChangeLog).filter(BudgetChangeLog.project_code == project_code).delete()
+
+    # Client 삭제 (다른 프로젝트에서 참조하지 않는 경우)
+    if proj.client_id:
+        other = db.query(Project).filter(
+            Project.client_id == proj.client_id, Project.project_code != project_code
+        ).count()
+        if other == 0:
+            db.query(Client).filter(Client.id == proj.client_id).delete()
+
+    db.delete(proj)
+    db.commit()
+
+    return {"message": f"{project_code} 삭제 완료"}
 
 
 @router.get("/projects/{project_code}/info")
@@ -285,6 +446,7 @@ def get_members(project_code: str, db: Session = Depends(get_db)):
             "role": m.role,
             "name": m.name,
             "empno": m.empno,
+            "grade": m.grade or "",
             "activity_mapping": m.activity_mapping,
             "sort_order": m.sort_order,
         }
@@ -306,6 +468,7 @@ def save_members(
             role=m.role,
             name=m.name,
             empno=m.empno,
+            grade=m.grade or "",
             activity_mapping=m.activity_mapping,
             sort_order=m.sort_order or i,
         ))

@@ -10,12 +10,17 @@ from app.models.project import Project, Client
 from app.models.budget_master import ProjectMember
 from app.services import azure_service
 from app.services.excel_export import create_styled_excel
+from app.api.deps import get_optional_user, get_user_project_codes
+from sqlalchemy import or_
 
 router = APIRouter()
 
 
-def _get_filtered_projects(db: Session, project_code: Optional[str], el_empno: Optional[str]):
+def _get_filtered_projects(db: Session, project_code: Optional[str], el_empno: Optional[str],
+                           allowed_codes: Optional[list[str]] = None):
     query = db.query(Project)
+    if allowed_codes is not None:
+        query = query.filter(Project.project_code.in_(allowed_codes))
     if project_code:
         query = query.filter(Project.project_code == project_code)
     if el_empno:
@@ -23,8 +28,35 @@ def _get_filtered_projects(db: Session, project_code: Optional[str], el_empno: O
     return query.all()
 
 
-def _get_filtered_project_codes(db: Session, project_code: Optional[str], el_empno: Optional[str]) -> list[str]:
-    return [p.project_code for p in _get_filtered_projects(db, project_code, el_empno)]
+def _get_filtered_project_codes(db: Session, project_code: Optional[str], el_empno: Optional[str],
+                                allowed_codes: Optional[list[str]] = None) -> list[str]:
+    return [p.project_code for p in _get_filtered_projects(db, project_code, el_empno, allowed_codes)]
+
+
+def _apply_budget_scope(query, project_code: Optional[str], el_empno: Optional[str],
+                        allowed_codes: Optional[list[str]], db: Session):
+    """BudgetDetail 쿼리에 프로젝트 범위 필터 적용."""
+    if allowed_codes is not None:
+        query = query.filter(BudgetDetail.project_code.in_(allowed_codes))
+    if project_code:
+        query = query.filter(BudgetDetail.project_code == project_code)
+    if el_empno:
+        el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
+        query = query.filter(BudgetDetail.project_code.in_(el_pcs))
+    return query
+
+
+def _apply_member_scope(query, project_code: Optional[str], el_empno: Optional[str],
+                        allowed_codes: Optional[list[str]], db: Session):
+    """ProjectMember 쿼리에 프로젝트 범위 필터 적용."""
+    if allowed_codes is not None:
+        query = query.filter(ProjectMember.project_code.in_(allowed_codes))
+    if project_code:
+        query = query.filter(ProjectMember.project_code == project_code)
+    if el_empno:
+        el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
+        query = query.filter(ProjectMember.project_code.in_(el_pcs))
+    return query
 
 
 def _excel_response(output, filename: str):
@@ -43,11 +75,16 @@ def export_data(
     el_empno: Optional[str] = Query(None),
     project_code: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
 ):
-    """Excel 내보내기."""
+    """Excel 내보내기 (로그인 사용자 권한 범위)."""
+    # 로그인된 사용자의 프로젝트만 허용
+    allowed_codes = None
+    if user:
+        allowed_codes = get_user_project_codes(db, user["empno"])
 
     if view_type == "overview":
-        prj_list = _get_filtered_projects(db, project_code, el_empno)
+        prj_list = _get_filtered_projects(db, project_code, el_empno, allowed_codes)
         pcs = [p.project_code for p in prj_list]
         actual_map = azure_service.get_actual_by_project(pcs) if pcs else {}
         headers = ["프로젝트코드", "프로젝트명", "EL", "PM", "계약시간", "총Budget", "총Actual", "진행률"]
@@ -75,11 +112,7 @@ def export_data(
             BudgetDetail.project_code, BudgetDetail.budget_category,
             sa_func.sum(BudgetDetail.budget_hours).label("budget_hours"),
         ).group_by(BudgetDetail.project_code, BudgetDetail.budget_category)
-        if project_code:
-            query = query.filter(BudgetDetail.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            query = query.filter(BudgetDetail.project_code.in_(el_pcs))
+        query = _apply_budget_scope(query, project_code, el_empno, allowed_codes, db)
         rows = []
         for r in query.all():
             proj_name = db.query(Project.project_name).filter(Project.project_code == r.project_code).scalar()
@@ -90,7 +123,7 @@ def export_data(
         headers = ["프로젝트코드", "프로젝트명", "EL", "PM", "QRP", "EL시간", "PM시간", "QRP시간"]
         col_types = ["str", "str", "str", "str", "str", "num", "num", "num"]
         rows = []
-        for p in _get_filtered_projects(db, project_code, el_empno):
+        for p in _get_filtered_projects(db, project_code, el_empno, allowed_codes):
             rows.append([p.project_code, p.project_name, p.el_name, p.pm_name, p.qrp_name,
                          p.el_hours or 0, p.pm_hours or 0, p.qrp_hours or 0])
         return _excel_response(create_styled_excel("ELPMQRP", headers, rows, col_types), "Overview_ELPMQRP")
@@ -102,14 +135,10 @@ def export_data(
             BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade, BudgetDetail.department,
             sa_func.sum(BudgetDetail.budget_hours).label("budget_hours"),
         )
-        if project_code:
-            budget_by_emp = budget_by_emp.filter(BudgetDetail.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            budget_by_emp = budget_by_emp.filter(BudgetDetail.project_code.in_(el_pcs))
+        budget_by_emp = _apply_budget_scope(budget_by_emp, project_code, el_empno, allowed_codes, db)
         budget_by_emp = budget_by_emp.group_by(
             BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade, BudgetDetail.department).all()
-        pcs = _get_filtered_project_codes(db, project_code, el_empno)
+        pcs = _get_filtered_project_codes(db, project_code, el_empno, allowed_codes)
         empnos = [r.empno for r in budget_by_emp]
         actual_map = azure_service.get_actual_by_empno(empnos, pcs) if empnos and pcs else {}
         rows = []
@@ -129,7 +158,7 @@ def export_data(
                     "QRP시간", "EL시간", "PM시간", "Fulcrum", "RA_Staff", "Specialist", "총Budget", "작성상태"]
         col_types = ["str", "str", "str", "str", "str", "num", "num", "num", "num", "num", "num", "num", "num", "num", "str"]
         rows = []
-        for p in _get_filtered_projects(db, project_code, el_empno):
+        for p in _get_filtered_projects(db, project_code, el_empno, allowed_codes):
             rows.append([p.project_code, p.project_name, p.el_name, p.pm_name, p.department,
                          p.contract_hours or 0, p.axdx_hours or 0, p.qrp_hours or 0,
                          p.el_hours or 0, p.pm_hours or 0, p.fulcrum_hours or 0,
@@ -141,11 +170,7 @@ def export_data(
         headers = ["사번", "이름", "직급", "부서", "프로젝트코드", "대분류", "Budget관리단위", "연월", "Budget시간"]
         col_types = ["str", "str", "str", "str", "str", "str", "str", "str", "num1"]
         query = db.query(BudgetDetail).order_by(BudgetDetail.empno, BudgetDetail.project_code, BudgetDetail.year_month)
-        if project_code:
-            query = query.filter(BudgetDetail.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            query = query.filter(BudgetDetail.project_code.in_(el_pcs))
+        query = _apply_budget_scope(query, project_code, el_empno, allowed_codes, db)
         rows = [[r.empno, r.emp_name, r.grade, r.department, r.project_code,
                  r.budget_category, r.budget_unit, r.year_month, float(r.budget_hours or 0)] for r in query.all()]
         return _excel_response(create_styled_excel("인별Detail", headers, rows, col_types), "Project_인별Detail")
@@ -157,11 +182,7 @@ def export_data(
             BudgetDetail.project_code, BudgetDetail.budget_category, BudgetDetail.budget_unit,
             sa_func.sum(BudgetDetail.budget_hours).label("total_hours"),
         ).group_by(BudgetDetail.project_code, BudgetDetail.budget_category, BudgetDetail.budget_unit)
-        if project_code:
-            query = query.filter(BudgetDetail.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            query = query.filter(BudgetDetail.project_code.in_(el_pcs))
+        query = _apply_budget_scope(query, project_code, el_empno, allowed_codes, db)
         rows = [[r.project_code, r.budget_category, r.budget_unit, float(r.total_hours)] for r in query.all()]
         return _excel_response(create_styled_excel("Budget집계", headers, rows, col_types), "Project_Budget집계")
 
@@ -170,11 +191,7 @@ def export_data(
         col_types = ["str", "str", "str", "str", "str", "str", "str", "str", "num1"]
         query = db.query(BudgetDetail).order_by(
             BudgetDetail.project_code, BudgetDetail.budget_category, BudgetDetail.budget_unit, BudgetDetail.year_month)
-        if project_code:
-            query = query.filter(BudgetDetail.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            query = query.filter(BudgetDetail.project_code.in_(el_pcs))
+        query = _apply_budget_scope(query, project_code, el_empno, allowed_codes, db)
         rows = [[r.project_code, r.budget_category, r.budget_unit, r.empno, r.emp_name,
                  r.grade, r.department, r.year_month, float(r.budget_hours or 0)] for r in query.all()]
         return _excel_response(create_styled_excel("BudgetDetail", headers, rows, col_types), "인별_BudgetDetail")
@@ -183,11 +200,7 @@ def export_data(
         headers = ["프로젝트코드", "역할", "이름", "사번", "Activity매핑", "Budget시간합계"]
         col_types = ["str", "str", "str", "str", "str", "num"]
         query = db.query(ProjectMember).order_by(ProjectMember.project_code, ProjectMember.sort_order)
-        if project_code:
-            query = query.filter(ProjectMember.project_code == project_code)
-        if el_empno:
-            el_pcs = db.query(Project.project_code).filter(Project.el_empno == el_empno).subquery()
-            query = query.filter(ProjectMember.project_code.in_(el_pcs))
+        query = _apply_member_scope(query, project_code, el_empno, allowed_codes, db)
         rows = []
         for m in query.all():
             bt = 0.0
@@ -198,7 +211,7 @@ def export_data(
         return _excel_response(create_styled_excel("FLDT구성원", headers, rows, col_types), "인별_FLDT구성원")
 
     elif view_type == "summary":
-        prj_list = _get_filtered_projects(db, project_code, el_empno)
+        prj_list = _get_filtered_projects(db, project_code, el_empno, allowed_codes)
         pcs = [p.project_code for p in prj_list]
         actual_map = azure_service.get_actual_by_project(pcs) if pcs else {}
         headers = ["프로젝트코드", "프로젝트명", "계약시간", "총Budget", "총Actual", "YRA", "AX/DX", "AX/DX비율"]
@@ -225,6 +238,8 @@ def export_data(
 
     elif view_type == "group-prj-summary":
         prj_list = db.query(Project).options(joinedload(Project.client)).order_by(Project.department, Project.project_code)
+        if allowed_codes is not None:
+            prj_list = prj_list.filter(Project.project_code.in_(allowed_codes))
         if el_empno:
             prj_list = prj_list.filter(Project.el_empno == el_empno)
         prj_list = prj_list.all()
@@ -247,14 +262,13 @@ def export_data(
         headers = ["프로젝트코드", "대분류", "Budget관리단위", "사번", "이름", "직급", "연월", "Budget시간"]
         col_types = ["str", "str", "str", "str", "str", "str", "str", "num1"]
         query = db.query(BudgetDetail)
-        if project_code:
-            query = query.filter(BudgetDetail.project_code == project_code)
+        query = _apply_budget_scope(query, project_code, el_empno, allowed_codes, db)
         rows = [[r.project_code, r.budget_category, r.budget_unit, r.empno, r.emp_name,
                  r.grade, r.year_month, float(r.budget_hours or 0)] for r in query.all()]
         return _excel_response(create_styled_excel("Budget원본", headers, rows, col_types), "Raw_Budget")
 
     elif view_type in ("actual", "actual-detail"):
-        pcs = _get_filtered_project_codes(db, project_code, el_empno)
+        pcs = _get_filtered_project_codes(db, project_code, el_empno, allowed_codes)
         if view_type == "actual":
             headers = ["프로젝트코드", "사번", "일자", "시간", "대분류", "중분류", "소분류", "Budget관리단위"]
             col_types = ["str", "str", "str", "num1", "str", "str", "str", "str"]
