@@ -33,7 +33,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
     if project:
         name = project.el_name if project.el_empno == req.empno else project.pm_name
-        token = create_token(req.empno, name or req.empno)
+        token = create_token(req.empno, name or req.empno, role="EL/PM")
         return LoginResponse(token=token, empno=req.empno, name=name or req.empno, role="EL/PM")
 
     # 2) Azure SQL 캐시: Budget 미등록 프로젝트의 EL/PM도 로그인 허용
@@ -42,11 +42,11 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     for ap in azure_projects:
         if ap.get("el_empno") == req.empno:
             name = ap.get("el_name") or req.empno
-            token = create_token(req.empno, name)
+            token = create_token(req.empno, name, role="EL/PM")
             return LoginResponse(token=token, empno=req.empno, name=name, role="EL/PM")
         if ap.get("pm_empno") == req.empno:
             name = ap.get("pm_name") or req.empno
-            token = create_token(req.empno, name)
+            token = create_token(req.empno, name, role="EL/PM")
             return LoginResponse(token=token, empno=req.empno, name=name, role="EL/PM")
 
     # 3) Staff(구성원)인지 확인 — project_members 또는 budget_details

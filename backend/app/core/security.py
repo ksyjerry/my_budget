@@ -7,10 +7,11 @@ ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
 
-def create_token(empno: str, name: str) -> str:
+def create_token(empno: str, name: str, role: str = "Staff") -> str:
     payload = {
         "empno": empno,
         "name": name,
+        "role": role,
         "exp": datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
