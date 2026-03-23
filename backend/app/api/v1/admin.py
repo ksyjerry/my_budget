@@ -11,7 +11,7 @@ from app.api.deps import get_optional_user
 router = APIRouter()
 
 # 관리자 접근 가능한 사번
-ADMIN_EMPNOS = {"170661", "160553"}
+ADMIN_EMPNOS = {"170661", "160553", "120507"}
 
 
 def _require_admin(user: Optional[dict]):
