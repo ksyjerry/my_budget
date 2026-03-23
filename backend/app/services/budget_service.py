@@ -196,6 +196,15 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
     total_axdx = sum(p.axdx_hours or 0 for p in projects)
     total_staff_budget = sum(budget_by_project.values())
 
+    # 작성여부: 모든 프로젝트가 "작성완료"이면 "작성완료", 하나라도 아니면 "작성중"
+    statuses = [p.template_status or "" for p in projects]
+    if not statuses:
+        template_status_summary = "-"
+    elif all(s == "작성완료" for s in statuses):
+        template_status_summary = "작성완료"
+    else:
+        template_status_summary = "작성중"
+
     # ③ Role 매핑 (EL/PM/QRP)
     role_mappings = []
     for p in projects:
@@ -282,6 +291,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
             "staff_budget": total_staff_budget,
             "actual_hours": total_actual,
             "progress": round(total_actual / total_contract * 100, 1) if total_contract else 0,
+            "template_status": template_status_summary,
         },
         "projects": [
             {
