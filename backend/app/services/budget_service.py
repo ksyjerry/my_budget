@@ -12,6 +12,20 @@ from app.services.budget_category_map import get_category
 
 logger = logging.getLogger(__name__)
 
+CATEGORY_ORDER = {
+    "분반기 검토": 1,
+    "계획단계": 2,
+    "재무제표 수준 위험": 3,
+    "자산": 4,
+    "부채 및 자본": 5,
+    "수익/비용": 6,
+    "종결단계": 7,
+    "연결": 8,
+    "내부통제": 9,
+    "IT 감사-RA": 10,
+    "(미배정)": 99,
+}
+
 
 def upsert_project_from_client_data(db: Session, data: dict) -> Project:
     """Client/Project 정보를 DB에 저장 또는 업데이트."""
@@ -337,7 +351,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                 for unit, actual in actual_unit_map.items()
                 if unit not in budget_by_unit and actual > 0
             ],
-            key=lambda x: (x["category"], -x["budget"]),
+            key=lambda x: (CATEGORY_ORDER.get(x["category"], 50), -x["budget"]),
         ),
         "elpm_qrp_time": elpm_qrp_time,
         "staff_time": staff_time,

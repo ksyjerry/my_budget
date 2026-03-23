@@ -13,6 +13,7 @@ from app.models.budget import BudgetDetail
 from app.services.budget_service import get_overview_data
 from app.services import azure_service
 from app.api.deps import get_optional_user, get_user_project_codes
+from app.services.budget_service import CATEGORY_ORDER
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -154,7 +155,7 @@ def get_person_overview(
             for unit, actual in actual_by_unit.items()
             if unit not in unit_budgets and actual > 0
         ],
-        key=lambda x: (x["category"], -x["budget"]),
+        key=lambda x: (CATEGORY_ORDER.get(x["category"], 50), -x["budget"]),
     )
 
     total_budget = sum(project_budgets.values())
