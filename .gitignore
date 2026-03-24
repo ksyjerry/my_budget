@@ -5,8 +5,7 @@ __pycache__/
 
 # Environment
 .env
-.env.*
-!.env.example
+
 
 # Data exports
 data/
