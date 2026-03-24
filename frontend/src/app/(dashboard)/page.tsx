@@ -385,8 +385,8 @@ function OverviewInner() {
                           )}
                           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{row.name}</td>
                           <td className="px-3 py-1.5 text-xs">{row.grade}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.budget || ""}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.actual || ""}</td>
+                          <td className="px-3 py-1.5 text-xs text-right">{row.budget ? Math.round(row.budget).toLocaleString() : ""}</td>
+                          <td className="px-3 py-1.5 text-xs text-right">{row.actual ? Math.round(row.actual).toLocaleString() : ""}</td>
                           <td className="px-3 py-1.5 text-xs text-right">
                             <ProgressBadge value={row.progress} />
                           </td>
