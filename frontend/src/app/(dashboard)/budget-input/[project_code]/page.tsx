@@ -699,21 +699,21 @@ function ClientSearchModal({
   const [results, setResults] = useState<ClientInfo[]>([]);
   const [searching, setSearching] = useState(false);
 
+  const [searched, setSearched] = useState(false);
+
   const doSearch = async () => {
+    if (!query.trim()) return;
     setSearching(true);
+    setSearched(true);
     try {
       const res = await fetch(
-        `${API_BASE}/api/v1/budget/clients/search?q=${encodeURIComponent(query)}`
+        `${API_BASE}/api/v1/budget/clients/search?q=${encodeURIComponent(query.trim())}`
       );
       if (res.ok) setResults(await res.json());
     } finally {
       setSearching(false);
     }
   };
-
-  useEffect(() => {
-    doSearch();
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -740,7 +740,7 @@ function ClientSearchModal({
             />
             <button
               type="submit"
-              disabled={searching}
+              disabled={searching || !query.trim()}
               className="px-4 py-2 text-sm font-medium bg-pwc-orange text-white rounded-lg hover:bg-[#B83D02] transition-colors disabled:opacity-50"
             >
               {searching ? "검색중..." : "검색"}
@@ -750,7 +750,11 @@ function ClientSearchModal({
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {results.length === 0 ? (
+          {!searched ? (
+            <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
+              검색어를 입력하고 검색 버튼을 클릭하세요.
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
               {searching ? "검색 중..." : "검색 결과가 없습니다."}
             </div>
@@ -800,12 +804,15 @@ function ProjectSearchModal({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
 
   const doSearch = async () => {
+    if (!query.trim()) return;
     setSearching(true);
+    setSearched(true);
     try {
       const params = new URLSearchParams();
-      if (query) params.set("q", query);
+      if (query.trim()) params.set("q", query.trim());
       if (clientCode) params.set("client_code", clientCode);
       const res = await fetch(
         `${API_BASE}/api/v1/budget/projects/search?${params.toString()}`
@@ -815,10 +822,6 @@ function ProjectSearchModal({
       setSearching(false);
     }
   };
-
-  useEffect(() => {
-    doSearch();
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -839,7 +842,7 @@ function ProjectSearchModal({
             />
             <button
               type="submit"
-              disabled={searching}
+              disabled={searching || !query.trim()}
               className="px-4 py-2 text-sm font-medium bg-pwc-orange text-white rounded-lg hover:bg-[#B83D02] transition-colors disabled:opacity-50"
             >
               {searching ? "검색중..." : "검색"}
@@ -847,7 +850,11 @@ function ProjectSearchModal({
           </form>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
-          {results.length === 0 ? (
+          {!searched ? (
+            <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
+              검색어를 입력하고 검색 버튼을 클릭하세요.
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
               {searching ? "검색 중..." : "검색 결과가 없습니다."}
             </div>
@@ -905,23 +912,22 @@ function CloneProjectModal({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
 
   const doSearch = async () => {
+    if (!query.trim()) return;
     setSearching(true);
+    setSearched(true);
     try {
       // PostgreSQL에 등록된 프로젝트만 검색 (Budget이 있는 것)
       const res = await fetch(
-        `${API_BASE}/api/v1/budget/projects/list?q=${encodeURIComponent(query)}`
+        `${API_BASE}/api/v1/budget/projects/list?q=${encodeURIComponent(query.trim())}`
       );
       if (res.ok) setResults(await res.json());
     } finally {
       setSearching(false);
     }
   };
-
-  useEffect(() => {
-    doSearch();
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -942,7 +948,7 @@ function CloneProjectModal({
             />
             <button
               type="submit"
-              disabled={searching}
+              disabled={searching || !query.trim()}
               className="px-4 py-2 text-sm font-medium bg-pwc-orange text-white rounded-lg hover:bg-[#B83D02] transition-colors disabled:opacity-50"
             >
               {searching ? "검색중..." : "검색"}
@@ -953,7 +959,11 @@ function CloneProjectModal({
           Budget이 등록된 프로젝트만 표시됩니다. 선택하면 시간배분, 구성원, Budget Template 정보를 모두 가져옵니다.
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
-          {results.length === 0 ? (
+          {!searched ? (
+            <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
+              검색어를 입력하고 검색 버튼을 클릭하세요.
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
               {searching ? "검색 중..." : "검색 결과가 없습니다."}
             </div>
