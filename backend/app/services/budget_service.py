@@ -276,14 +276,27 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
             "progress": round(actual / rm["budget"] * 100, 1) if rm["budget"] else 0,
         })
 
-    # Staff time (budget 내림차순 정렬)
+    # Staff time — Azure 직원 마스터에서 본부/직급 보정
+    try:
+        emp_list = azure_service.get_employees()
+        emp_lookup = {e["empno"]: e for e in emp_list}
+    except Exception:
+        emp_lookup = {}
+
     staff_list = sorted(staff_budget.values(), key=lambda x: x["budget"], reverse=True)
     staff_time = []
     for s in staff_list:
         b = s["budget"]
         a = staff_actual_map.get(s["empno"], 0)
+        azure_emp = emp_lookup.get(s["empno"])
+        dept = (azure_emp["department"] if azure_emp else None) or s.get("department") or ""
+        grade = s.get("grade") or ""
+        if azure_emp and not grade:
+            grade = azure_emp.get("grade_name", "")
         staff_time.append({
             **s,
+            "department": dept,
+            "grade": grade,
             "actual": a,
             "progress": round(a / b * 100, 1) if b else 0,
         })
