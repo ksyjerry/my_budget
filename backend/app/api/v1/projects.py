@@ -102,8 +102,8 @@ def get_project_detail(
     def _emp_grade(empno: str, fallback: str) -> str:
         info = emp_lookup.get(empno)
         if info and info.get("grade_name"):
-            return info["grade_name"]
-        return fallback or ""
+            return azure_service.shorten_grade(info["grade_name"])
+        return azure_service.shorten_grade(fallback) if fallback else ""
 
     # Budget 기반 details
     details = []
@@ -151,11 +151,15 @@ def get_project_detail(
             "project_name": project.project_name,
             "contract_hours": project.contract_hours,
             "axdx_hours": project.axdx_hours,
+            "qrp_hours": project.qrp_hours,
+            "rm_hours": project.rm_hours,
             "el_hours": project.el_hours,
             "pm_hours": project.pm_hours,
+            "ra_elpm_hours": project.ra_elpm_hours,
             "fulcrum_hours": project.fulcrum_hours,
             "ra_staff_hours": project.ra_staff_hours,
             "specialist_hours": project.specialist_hours,
+            "travel_hours": project.travel_hours,
             "et_controllable_budget": project.et_controllable_budget,
             "total_budget_hours": project.total_budget_hours,
         },

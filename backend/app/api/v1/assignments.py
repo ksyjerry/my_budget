@@ -78,7 +78,7 @@ def list_assignments(
             "empno": r.empno,
             "emp_name": r.emp_name,
             "department": r.department,
-            "grade": r.grade,
+            "grade": azure_service.shorten_grade(r.grade or ""),
             "total_budget": float(r.total_budget),
         }
         for r in results
@@ -158,7 +158,7 @@ def get_assignment_detail(
         "empno": empno,
         "emp_name": emp_info.emp_name if emp_info else "",
         "department": emp_info.department if emp_info else "",
-        "grade": emp_info.grade if emp_info else "",
+        "grade": azure_service.shorten_grade(emp_info.grade) if emp_info else "",
         "projects": projects_summary,
         "details": _build_details(budget_by_project, actual_map, project_info_map),
     }

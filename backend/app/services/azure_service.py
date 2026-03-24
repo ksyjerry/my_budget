@@ -11,6 +11,37 @@ from app.models.budget import ActivityBudgetMapping
 
 logger = logging.getLogger(__name__)
 
+# 직급 Full Name → 약어 매핑
+GRADE_SHORT: dict[str, str] = {
+    "Partner": "P",
+    "Ptr": "P",
+    "Managing Director": "MD",
+    "AC Director": "D",
+    "Director": "D",
+    "Dir": "D",
+    "Senior-Manager": "SM",
+    "AC Manager": "M",
+    "Manager": "M",
+    "Manager 1": "M",
+    "Manager 2": "M",
+    "Senior-Associate": "SA",
+    "Senior-Associate 1": "SA",
+    "Senior-Associate 2": "SA",
+    "SA1": "SA",
+    "SA2": "SA",
+    "Associate": "A",
+    "Assistant-Associate": "AA",
+    "Intern": "Intern",
+    "RP": "RP",
+}
+
+
+def shorten_grade(grade: str) -> str:
+    """직급 Full Name을 약어로 변환."""
+    if not grade:
+        return ""
+    return GRADE_SHORT.get(grade, grade)
+
 # ── 캐시 설정 ──────────────────────────────────────
 _CACHE_TTL = 900  # 15분
 _cache: dict[str, tuple[float, object]] = {}
