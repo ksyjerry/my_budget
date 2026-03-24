@@ -19,7 +19,7 @@ function ProgressBadge({ rate }: { rate: number }) {
   let colorClass = "text-pwc-green";
   if (rate > 110) colorClass = "text-pwc-red";
   else if (rate > 90) colorClass = "text-pwc-orange";
-  return <span className={`text-xs font-semibold ${colorClass}`}>{rate.toFixed(1)}%</span>;
+  return <span className={`text-xs font-semibold ${colorClass}`}>{Math.round(rate)}%</span>;
 }
 
 /* ───────── Cross-filter dimension resolver ───────── */
@@ -354,8 +354,8 @@ function AssignmentsContent() {
                             <td className="px-3 py-2 text-pwc-black max-w-[260px] truncate">{row.project}</td>
                             <td className="px-3 py-2 text-pwc-black">{row.el}</td>
                             <td className="px-3 py-2 text-pwc-black">{row.pm}</td>
-                            <td className="px-3 py-2 text-right text-pwc-black">{row.budget.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right text-pwc-black">{row.actual.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-pwc-black">{Math.round(row.budget).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-pwc-black">{Math.round(row.actual).toLocaleString()}</td>
                             <td className={`px-3 py-2 text-right font-semibold ${row.remaining < 0 ? "text-pwc-red" : "text-pwc-black"}`}>
                               {row.remaining}
                             </td>
@@ -373,9 +373,9 @@ function AssignmentsContent() {
                         return (
                           <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold">
                             <td className="px-3 py-2" colSpan={6}>합계</td>
-                            <td className="px-3 py-2 text-right">{totalBudget.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">{totalActual.toLocaleString()}</td>
-                            <td className={`px-3 py-2 text-right ${totalRemaining < 0 ? "text-pwc-red" : ""}`}>{totalRemaining.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right">{Math.round(totalBudget).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right">{Math.round(totalActual).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right ${totalRemaining < 0 ? "text-pwc-red" : ""}`}>{Math.round(totalRemaining).toLocaleString()}</td>
                             <td className="px-3 py-2 text-right"><ProgressBadge rate={totalRate} /></td>
                           </tr>
                         );
@@ -481,9 +481,9 @@ function AssignmentsContent() {
                         return (
                           <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold">
                             <td className="px-3 py-2" colSpan={4}>합계</td>
-                            <td className="px-3 py-2 text-right">{totalBudget.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">{totalActual.toLocaleString()}</td>
-                            <td className={`px-3 py-2 text-right ${totalRemaining < 0 ? "text-pwc-red" : ""}`}>{totalRemaining.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right">{Math.round(totalBudget).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right">{Math.round(totalActual).toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right ${totalRemaining < 0 ? "text-pwc-red" : ""}`}>{Math.round(totalRemaining).toLocaleString()}</td>
                             <td className="px-3 py-2 text-right"><ProgressBadge rate={totalRate} /></td>
                           </tr>
                         );

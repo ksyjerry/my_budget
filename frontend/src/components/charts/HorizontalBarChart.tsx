@@ -150,11 +150,11 @@ export default function HorizontalBarChart({
       .on("mouseenter", function (event, d) {
         if (!hasActive || d.name === activeBar) d3.select(this).transition().duration(150).attr("fill", "#ABABAB");
         showTooltip(event,
-          `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${d.budget.toLocaleString()}</strong>`);
+          `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${Math.round(d.budget).toLocaleString()}</strong>`);
       })
       .on("mousemove", function (event, d) {
         showTooltip(event,
-          `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${d.budget.toLocaleString()}</strong>`);
+          `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${Math.round(d.budget).toLocaleString()}</strong>`);
       })
       .on("mouseleave", function () {
         d3.select(this).transition().duration(150).attr("fill", BUDGET_COLOR);
@@ -173,14 +173,14 @@ export default function HorizontalBarChart({
         const base = d.actual > d.budget && d.budget > 0 ? ACTUAL_OVER_COLOR : ACTUAL_COLOR;
         if (!hasActive || d.name === activeBar)
           d3.select(this).transition().duration(150).attr("fill", d3.color(base)!.darker(0.3).formatHex());
-        const pct = d.budget > 0 ? ((d.actual / d.budget) * 100).toFixed(1) : "-";
+        const pct = d.budget > 0 ? Math.round((d.actual / d.budget) * 100) : "-";
         showTooltip(event,
-          `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${d.actual.toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
+          `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${Math.round(d.actual).toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
       })
       .on("mousemove", function (event, d) {
-        const pct = d.budget > 0 ? ((d.actual / d.budget) * 100).toFixed(1) : "-";
+        const pct = d.budget > 0 ? Math.round((d.actual / d.budget) * 100) : "-";
         showTooltip(event,
-          `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${d.actual.toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
+          `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${Math.round(d.actual).toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
       })
       .on("mouseleave", function (_, d) {
         d3.select(this).transition().duration(150)
@@ -196,7 +196,7 @@ export default function HorizontalBarChart({
       .attr("y", halfBand).attr("dy", "0.35em")
       .style("font-size", "10px").style("fill", "#6D6D6D").style("opacity", 0)
       .text((d) => {
-        const pct = d.budget > 0 ? ((d.actual / d.budget) * 100).toFixed(0) : "0";
+        const pct = d.budget > 0 ? Math.round((d.actual / d.budget) * 100) : 0;
         return `${pct}%`;
       })
       .transition().duration(400).delay((_, i) => i * 80 + 500)

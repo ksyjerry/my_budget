@@ -2132,15 +2132,7 @@ function Step3Template({
       {/* Excel-like Spreadsheet Grid */}
       <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm">
         <table ref={gridRef} className="w-full text-xs whitespace-nowrap border-collapse select-none" style={{ tableLayout: "fixed" }}>
-          <colgroup>
-            <col style={{ width: 32 }} /> {/* checkbox */}
-            <col style={{ width: 100 }} /> {/* 대분류 */}
-            <col style={{ width: 180 }} /> {/* 관리단위 */}
-            <col style={{ width: 140 }} /> {/* 담당자 */}
-            <col style={{ width: 56 }} /> {/* 합계 */}
-            {MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}
-            <col style={{ width: 56 }} /> {/* actions */}
-          </colgroup>
+          <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 56 }} />{MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}<col style={{ width: 56 }} /></colgroup>
           <thead className="bg-pwc-gray-50 sticky top-0 z-10">
             <tr className="border-b border-pwc-gray-200">
               <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">

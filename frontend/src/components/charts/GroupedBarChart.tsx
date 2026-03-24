@@ -157,13 +157,13 @@ export default function GroupedBarChart({
           if (!hasActive || d.group === activeBar)
             d3.select(this).transition().duration(150).attr("fill", d3.color(s.color)!.darker(0.2).formatHex());
           const lines = series.map((ss) =>
-            `<span style="color:${ss.color}">&#9679;</span> ${ss.label}: <strong>${Number(d[ss.key] || 0).toLocaleString()}</strong>`
+            `<span style="color:${ss.color}">&#9679;</span> ${ss.label}: <strong>${Math.round(Number(d[ss.key] || 0)).toLocaleString()}</strong>`
           ).join("<br/>");
           showTooltip(event, `<strong>${d.group}</strong><br/>${lines}`);
         })
         .on("mousemove", function (event, d) {
           const lines = series.map((ss) =>
-            `<span style="color:${ss.color}">&#9679;</span> ${ss.label}: <strong>${Number(d[ss.key] || 0).toLocaleString()}</strong>`
+            `<span style="color:${ss.color}">&#9679;</span> ${ss.label}: <strong>${Math.round(Number(d[ss.key] || 0)).toLocaleString()}</strong>`
           ).join("<br/>");
           showTooltip(event, `<strong>${d.group}</strong><br/>${lines}`);
         })

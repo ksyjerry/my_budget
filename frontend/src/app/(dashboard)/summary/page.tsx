@@ -9,7 +9,7 @@ import GroupedBarChart from "@/components/charts/GroupedBarChart";
 // --- Helpers ---
 
 function fmt(n: number): string {
-  return n.toLocaleString();
+  return Math.round(n).toLocaleString();
 }
 
 function yraColor(yra: number): string {
@@ -177,10 +177,10 @@ function SummaryContent() {
                           <td className="px-3 py-1.5 text-xs text-right">{fmt(row.total_budget)}</td>
                           <td className="px-3 py-1.5 text-xs text-right">{fmt(row.total_actual)}</td>
                           <td className={`px-3 py-1.5 text-xs text-right font-semibold ${yraColor(row.yra)}`}>
-                            {row.yra.toFixed(1)}%
+                            {Math.round(row.yra)}%
                           </td>
                           <td className="px-3 py-1.5 text-xs text-right">{fmt(row.axdx)}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.axdx_ratio.toFixed(1)}%</td>
+                          <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.axdx_ratio)}%</td>
                         </tr>
                       );
                     })}
@@ -191,10 +191,10 @@ function SummaryContent() {
                         <td className="px-3 py-2 text-right">{fmt(groupTotals.budget)}</td>
                         <td className="px-3 py-2 text-right">{fmt(groupTotals.actual)}</td>
                         <td className={`px-3 py-2 text-right font-semibold ${yraColor(groupTotalYra)}`}>
-                          {groupTotalYra.toFixed(1)}%
+                          {Math.round(groupTotalYra)}%
                         </td>
                         <td className="px-3 py-2 text-right">{fmt(groupTotals.axdx)}</td>
-                        <td className="px-3 py-2 text-right">{groupTotalRatio.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right">{Math.round(groupTotalRatio)}%</td>
                       </tr>
                     )}
                   </tbody>
@@ -231,10 +231,10 @@ function SummaryContent() {
                         <td className="px-3 py-1.5 text-xs text-right">{fmt(row.total_budget)}</td>
                         <td className="px-3 py-1.5 text-xs text-right">{fmt(row.total_actual)}</td>
                         <td className={`px-3 py-1.5 text-xs text-right font-semibold ${yraColor(row.yra)}`}>
-                          {row.yra.toFixed(1)}%
+                          {Math.round(row.yra)}%
                         </td>
                         <td className="px-3 py-1.5 text-xs text-right">{fmt(row.axdx)}</td>
-                        <td className="px-3 py-1.5 text-xs text-right">{row.axdx_ratio.toFixed(1)}%</td>
+                        <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.axdx_ratio)}%</td>
                       </tr>
                     ))}
                     {filteredProjects.length > 0 && (
@@ -244,10 +244,10 @@ function SummaryContent() {
                         <td className="px-3 py-2 text-right">{fmt(projectTotals.budget)}</td>
                         <td className="px-3 py-2 text-right">{fmt(projectTotals.actual)}</td>
                         <td className={`px-3 py-2 text-right font-semibold ${yraColor(projectTotalYra)}`}>
-                          {projectTotalYra.toFixed(1)}%
+                          {Math.round(projectTotalYra)}%
                         </td>
                         <td className="px-3 py-2 text-right">{fmt(projectTotals.axdx)}</td>
-                        <td className="px-3 py-2 text-right">{projectTotalRatio.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right">{Math.round(projectTotalRatio)}%</td>
                       </tr>
                     )}
                   </tbody>

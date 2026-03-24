@@ -17,7 +17,7 @@ export default function KPICard({ label, value, subtitle, highlight }: KPICardPr
           : "text-pwc-black"
         }`}
       >
-        {typeof value === "number" ? value.toLocaleString() : value}
+        {typeof value === "number" ? Math.round(value).toLocaleString() : value}
       </p>
       {subtitle && (
         <p className="text-[11px] text-pwc-gray-600 mt-1">{subtitle}</p>

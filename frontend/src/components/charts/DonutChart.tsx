@@ -113,12 +113,12 @@ export default function DonutChart({
         setHoveredIndex(i);
         d3.select(this).transition().duration(200)
           .attr("d", arcHover(d) as string).attr("opacity", 1);
-        const pct = ((d.data.value / total) * 100).toFixed(1);
-        showTooltip(event, `<strong>${d.data.name}</strong><br/>${d.data.value.toLocaleString()} (${pct}%)`);
+        const pct = Math.round((d.data.value / total) * 100);
+        showTooltip(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
       })
       .on("mousemove", function (event, d) {
-        const pct = ((d.data.value / total) * 100).toFixed(1);
-        showTooltip(event, `<strong>${d.data.name}</strong><br/>${d.data.value.toLocaleString()} (${pct}%)`);
+        const pct = Math.round((d.data.value / total) * 100);
+        showTooltip(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
       })
       .on("mouseleave", function (_, d) {
         setHoveredIndex(null);
@@ -142,7 +142,7 @@ export default function DonutChart({
       .style("font-size", `${Math.max(14, size / 12)}px`)
       .style("font-weight", "700")
       .style("fill", "#2D2D2D")
-      .text(total.toLocaleString());
+      .text(Math.round(total).toLocaleString());
 
     // Entry animation
     g.selectAll("path")
@@ -168,7 +168,7 @@ export default function DonutChart({
       {/* Legend — right-aligned, vertically centered */}
       <div className="flex flex-col justify-center gap-1 text-xs shrink-0 py-1">
         {sortedData.map((d, i) => {
-          const pct = ((d.value / total) * 100).toFixed(1);
+          const pct = Math.round((d.value / total) * 100);
           const dimmed = hasActive && d.name !== activeSegment;
           const highlighted = hoveredIndex === i;
 
@@ -190,7 +190,7 @@ export default function DonutChart({
               <span className="text-pwc-gray-900 whitespace-nowrap">
                 {d.name}{" "}
                 <span className="text-pwc-gray-600 font-medium">
-                  {d.value.toLocaleString()}
+                  {Math.round(d.value).toLocaleString()}
                 </span>{" "}
                 <span className="text-pwc-gray-600">({pct}%)</span>
               </span>

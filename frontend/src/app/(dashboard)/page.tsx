@@ -16,15 +16,15 @@ function ProgressBadge({ value }: { value: number }) {
       : value > 90
         ? "text-pwc-orange"
         : "text-pwc-green";
-  return <span className={`font-semibold ${color}`}>{value.toFixed(1)}%</span>;
+  return <span className={`font-semibold ${color}`}>{Math.round(value)}%</span>;
 }
 
 function SummaryRow({ label, budget, actual, progress }: { label: string; budget: number; actual: number; progress: number }) {
   return (
     <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-sm">
       <td colSpan={3} className="px-3 py-2 text-right">{label}</td>
-      <td className="px-3 py-2 text-right">{budget.toLocaleString()}</td>
-      <td className="px-3 py-2 text-right">{actual.toLocaleString()}</td>
+      <td className="px-3 py-2 text-right">{Math.round(budget).toLocaleString()}</td>
+      <td className="px-3 py-2 text-right">{Math.round(actual).toLocaleString()}</td>
       <td className="px-3 py-2 text-right"><ProgressBadge value={progress} /></td>
     </tr>
   );
@@ -257,8 +257,8 @@ function OverviewInner() {
                       <td className="px-3 py-1.5 text-xs whitespace-nowrap max-w-[220px] truncate" title={row.project_name}>{row.project_name}</td>
                       <td className="px-3 py-1.5 text-xs">{row.el_name}</td>
                       <td className="px-3 py-1.5 text-xs">{row.pm_name}</td>
-                      <td className="px-3 py-1.5 text-xs text-right">{row.budget.toLocaleString()}</td>
-                      <td className="px-3 py-1.5 text-xs text-right">{row.actual.toLocaleString()}</td>
+                      <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.budget).toLocaleString()}</td>
+                      <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.actual).toLocaleString()}</td>
                       <td className="px-3 py-1.5 text-xs text-right"><ProgressBadge value={row.progress} /></td>
                     </tr>
                   );
@@ -331,8 +331,8 @@ function OverviewInner() {
                   return (
                     <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-sm">
                       <td className="px-3 py-2" colSpan={2}>합계</td>
-                      <td className="px-3 py-2 text-right">{totalBudget.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{totalActual.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalBudget).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalActual).toLocaleString()}</td>
                       <td className="px-3 py-2 text-right"><ProgressBadge value={totalProgress} /></td>
                     </tr>
                   );
@@ -402,8 +402,8 @@ function OverviewInner() {
                   return (
                     <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-sm">
                       <td className="px-3 py-2" colSpan={3}>합계</td>
-                      <td className="px-3 py-2 text-right">{totalBudget.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{totalActual.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalBudget).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalActual).toLocaleString()}</td>
                       <td className="px-3 py-2 text-right"><ProgressBadge value={totalProgress} /></td>
                     </tr>
                   );
@@ -465,8 +465,8 @@ function OverviewInner() {
                             <td className="px-3 py-1.5 text-xs font-medium text-pwc-black align-top" rowSpan={span}>{cat}</td>
                           )}
                           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{row.unit}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.budget.toLocaleString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.actual.toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.budget).toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.actual).toLocaleString()}</td>
                           <td className="px-3 py-1.5 text-xs text-right">
                             <ProgressBadge value={row.progress} />
                           </td>
@@ -484,8 +484,8 @@ function OverviewInner() {
                   return (
                     <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-sm">
                       <td className="px-3 py-2" colSpan={2}>합계</td>
-                      <td className="px-3 py-2 text-right">{totalBudget.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{totalActual.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalBudget).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totalActual).toLocaleString()}</td>
                       <td className="px-3 py-2 text-right"><ProgressBadge value={totalProgress} /></td>
                     </tr>
                   );

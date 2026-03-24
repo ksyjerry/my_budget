@@ -36,7 +36,7 @@ function ProgressBadge({ value }: { value: number | null }) {
     colorClass = "text-pwc-orange";
   }
 
-  return <span className={`font-medium ${colorClass}`}>{value.toFixed(1)}%</span>;
+  return <span className={`font-medium ${colorClass}`}>{Math.round(value)}%</span>;
 }
 
 function SearchIcon() {
@@ -49,7 +49,7 @@ function SearchIcon() {
 
 function fmtNum(v: number | null): string {
   if (v === null || v === undefined) return "";
-  return v.toLocaleString();
+  return Math.round(v).toLocaleString();
 }
 
 // --------------- Page Component ---------------

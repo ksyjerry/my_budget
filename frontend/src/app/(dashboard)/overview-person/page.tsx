@@ -10,7 +10,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 function ProgressBadge({ value }: { value: number }) {
   if (value === 0) return <span className="text-pwc-gray-600">-</span>;
   const color = value > 110 ? "text-pwc-red" : value > 90 ? "text-pwc-orange" : "text-pwc-green";
-  return <span className={`font-semibold ${color}`}>{value.toFixed(1)}%</span>;
+  return <span className={`font-semibold ${color}`}>{Math.round(value)}%</span>;
 }
 
 interface ProjectItem {
@@ -148,16 +148,16 @@ export default function PersonOverviewPage() {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-white rounded-lg border border-pwc-gray-100/60 shadow-sm px-5 py-4">
               <p className="text-[11px] text-pwc-gray-600 font-medium tracking-wide uppercase mb-1">Budget time (A)</p>
-              <p className="text-2xl font-bold text-pwc-orange">{kpi.budget_total.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-pwc-orange">{Math.round(kpi.budget_total).toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-lg border border-pwc-gray-100/60 shadow-sm px-5 py-4">
               <p className="text-[11px] text-pwc-gray-600 font-medium tracking-wide uppercase mb-1">Actual time (B)</p>
-              <p className="text-2xl font-bold text-pwc-orange">{kpi.actual_total.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-pwc-orange">{Math.round(kpi.actual_total).toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-lg border border-pwc-gray-100/60 shadow-sm px-5 py-4">
               <p className="text-[11px] text-pwc-gray-600 font-medium tracking-wide uppercase mb-1">Progress (B)/(A)</p>
               <p className={`text-2xl font-bold ${kpi.progress > 110 ? "text-pwc-red" : kpi.progress > 90 ? "text-pwc-orange" : "text-pwc-green"}`}>
-                {kpi.progress.toFixed(1)}%
+                {Math.round(kpi.progress)}%
               </p>
             </div>
           </div>
@@ -190,15 +190,15 @@ export default function PersonOverviewPage() {
                       <td className="px-3 py-2 text-pwc-black max-w-[240px] truncate">{p.project_name}</td>
                       <td className="px-3 py-2 text-pwc-black">{p.el_name}</td>
                       <td className="px-3 py-2 text-pwc-black">{p.pm_name}</td>
-                      <td className="px-3 py-2 text-right text-pwc-black">{p.budget.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-pwc-black">{p.actual.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-pwc-black">{Math.round(p.budget).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-pwc-black">{Math.round(p.actual).toLocaleString()}</td>
                       <td className="px-3 py-2 text-right"><ProgressBadge value={p.progress} /></td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-xs">
                     <td className="px-3 py-2" colSpan={3}>합계</td>
-                    <td className="px-3 py-2 text-right">{projTotalBudget.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right">{projTotalActual.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right">{Math.round(projTotalBudget).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right">{Math.round(projTotalActual).toLocaleString()}</td>
                     <td className="px-3 py-2 text-right"><ProgressBadge value={projTotalProgress} /></td>
                   </tr>
                 </tbody>
@@ -259,8 +259,8 @@ export default function PersonOverviewPage() {
                             <td className="px-3 py-2 text-pwc-black font-medium align-top" rowSpan={span}>{cat}</td>
                           )}
                           <td className="px-3 py-2 text-pwc-black">{u.unit}</td>
-                          <td className="px-3 py-2 text-right text-pwc-black">{u.budget.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right text-pwc-black">{u.actual.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-pwc-black">{Math.round(u.budget).toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-pwc-black">{Math.round(u.actual).toLocaleString()}</td>
                           <td className="px-3 py-2 text-right"><ProgressBadge value={u.progress} /></td>
                         </tr>
                       );
@@ -276,8 +276,8 @@ export default function PersonOverviewPage() {
                   return (
                     <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold">
                       <td className="px-3 py-2" colSpan={2}>합계</td>
-                      <td className="px-3 py-2 text-right">{totB.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{totA.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totB).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right">{Math.round(totA).toLocaleString()}</td>
                       <td className="px-3 py-2 text-right"><ProgressBadge value={totP} /></td>
                     </tr>
                   );
