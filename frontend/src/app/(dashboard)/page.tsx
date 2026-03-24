@@ -359,42 +359,19 @@ function OverviewInner() {
               </thead>
               <tbody>
                 {staffTimeRows.length === 0 && !loading ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-pwc-gray-600">데이터가 없습니다.</td></tr>
-                ) : (() => {
-                  // 본부별 그룹핑 (셀 병합용)
-                  const byDivision: { division: string; rows: typeof staffTimeRows }[] = [];
-                  for (const row of staffTimeRows) {
-                    const last = byDivision[byDivision.length - 1];
-                    if (last && last.division === row.division) {
-                      last.rows.push(row);
-                    } else {
-                      byDivision.push({ division: row.division, rows: [row] });
-                    }
-                  }
-                  return byDivision.map((group) =>
-                    group.rows.map((row, ri) => {
-                      return (
-                        <tr
-                          key={`${group.division}-${ri}`}
-                          className="border-t border-pwc-gray-100 hover:bg-pwc-gray-50"
-                        >
-                          {ri === 0 && (
-                            <td className="px-3 py-1.5 text-xs font-medium align-top" rowSpan={group.rows.length}>
-                              {group.division}
-                            </td>
-                          )}
-                          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{row.name}</td>
-                          <td className="px-3 py-1.5 text-xs">{row.grade}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.budget ? Math.round(row.budget).toLocaleString() : ""}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">{row.actual ? Math.round(row.actual).toLocaleString() : ""}</td>
-                          <td className="px-3 py-1.5 text-xs text-right">
-                            <ProgressBadge value={row.progress} />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  );
-                })()}
+                  <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-pwc-gray-600">데이터가 없습니다.</td></tr>
+                ) : staffTimeRows.map((row, i) => (
+                  <tr key={`staff-${i}`} className="border-t border-pwc-gray-100 hover:bg-pwc-gray-50">
+                    <td className="px-3 py-1.5 text-xs">{row.division}</td>
+                    <td className="px-3 py-1.5 text-xs whitespace-nowrap">{row.name}</td>
+                    <td className="px-3 py-1.5 text-xs">{row.grade}</td>
+                    <td className="px-3 py-1.5 text-xs text-right">{row.budget ? Math.round(row.budget).toLocaleString() : ""}</td>
+                    <td className="px-3 py-1.5 text-xs text-right">{row.actual ? Math.round(row.actual).toLocaleString() : ""}</td>
+                    <td className="px-3 py-1.5 text-xs text-right">
+                      <ProgressBadge value={row.progress} />
+                    </td>
+                  </tr>
+                ))}
                 {staffTimeRows.length > 0 && (() => {
                   const totalBudget = staffTimeRows.reduce((s, r) => s + (r.budget || 0), 0);
                   const totalActual = staffTimeRows.reduce((s, r) => s + (r.actual || 0), 0);
