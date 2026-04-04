@@ -1342,6 +1342,17 @@ function Step1Form({
               className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
             />
           </div>
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              QRP
+            </label>
+            <input
+              type="text"
+              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : ""}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
         </div>
       </section>
 

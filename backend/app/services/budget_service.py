@@ -63,6 +63,8 @@ def upsert_project_from_client_data(db: Session, data: dict) -> Project:
     project.el_name = data.get("el_name", "")
     project.pm_empno = data.get("pm_empno", "")
     project.pm_name = data.get("pm_name", "")
+    project.qrp_empno = data.get("qrp_empno", "")
+    project.qrp_name = data.get("qrp_name", "")
     project.contract_hours = data.get("contract_hours", 0)
     project.axdx_hours = data.get("axdx_hours", 0)
     project.qrp_hours = data.get("qrp_hours", 0)
