@@ -47,27 +47,53 @@ def search_clients(q: str = "", db: Session = Depends(get_db)):
 
 @router.get("/employees/search")
 def search_employees(q: str = "", db: Session = Depends(get_db)):
-    """직원 이름/사번으로 검색 (budget_details 기반)."""
-    from sqlalchemy import func, distinct
-    query = (
-        db.query(
-            BudgetDetail.empno,
-            BudgetDetail.emp_name,
-            BudgetDetail.grade,
-        )
+    """직원 이름/사번으로 검색 (Azure 직원 마스터 + budget_details 병합)."""
+    if not q or len(q) < 2:
+        return []
+
+    from app.services import azure_service
+
+    result_map: dict[str, dict] = {}
+
+    # 1) Azure 직원 마스터에서 검색 (전체 LoS)
+    try:
+        for e in azure_service.get_employees():
+            empno = e.get("empno", "")
+            name = e.get("name", "")
+            if not empno or not name:
+                continue
+            if q in name or q in empno:
+                result_map[empno] = {
+                    "empno": empno,
+                    "name": name,
+                    "grade": e.get("grade_name", ""),
+                    "department": e.get("department", ""),
+                }
+    except Exception:
+        pass
+
+    # 2) budget_details에서도 검색 (Azure에 없는 인원 보완)
+    from sqlalchemy import func
+    bd_results = (
+        db.query(BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade)
         .filter(BudgetDetail.empno != "", BudgetDetail.emp_name != "")
-        .group_by(BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade)
-    )
-    if q:
-        query = query.filter(
+        .filter(
             (BudgetDetail.emp_name.ilike(f"%{q}%")) |
             (BudgetDetail.empno.ilike(f"%{q}%"))
         )
-    results = query.order_by(BudgetDetail.emp_name).limit(30).all()
-    return [
-        {"empno": r.empno, "name": r.emp_name, "grade": r.grade or ""}
-        for r in results
-    ]
+        .group_by(BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade)
+        .limit(30).all()
+    )
+    for r in bd_results:
+        if r.empno not in result_map:
+            result_map[r.empno] = {
+                "empno": r.empno,
+                "name": r.emp_name,
+                "grade": r.grade or "",
+            }
+
+    results = sorted(result_map.values(), key=lambda x: x["name"])
+    return results[:30]
 
 
 @router.get("/projects/list")
@@ -355,12 +381,25 @@ def update_project(project_code: str, req: ProjectCreateRequest, db: Session = D
 
 
 @router.delete("/projects/{project_code}")
-def delete_project(project_code: str, db: Session = Depends(get_db)):
-    """프로젝트 삭제 (구성원, Budget 데이터 포함)."""
+def delete_project(
+    project_code: str,
+    db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """프로젝트 삭제 (EL 또는 관리자만 가능)."""
     proj = db.query(Project).filter(Project.project_code == project_code).first()
     if not proj:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+
+    # 권한 체크: 해당 프로젝트의 EL이거나 관리자(scope=all)만 삭제 가능
+    if user:
+        from app.models.budget_master import PartnerAccessConfig
+        cfg = db.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == user["empno"]).first()
+        is_admin = cfg and cfg.scope == "all"
+        is_el = proj.el_empno == user["empno"]
+        if not is_admin and not is_el:
+            raise HTTPException(status_code=403, detail="해당 프로젝트의 EL 또는 관리자만 삭제할 수 있습니다.")
 
     # 관련 데이터 삭제
     db.query(BudgetDetail).filter(BudgetDetail.project_code == project_code).delete()

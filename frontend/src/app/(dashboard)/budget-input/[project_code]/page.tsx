@@ -17,6 +17,44 @@ import {
   MONTH_LABELS,
 } from "@/lib/budget-constants";
 
+// ── NumberField (외부 정의 — re-render 시 focus 유지) ──
+function NumberField({
+  label,
+  value,
+  onChange,
+  readOnly,
+  contractHours,
+}: {
+  label: string;
+  value: number;
+  onChange?: (v: number) => void;
+  readOnly?: boolean;
+  contractHours?: number;
+}) {
+  const pct = contractHours && contractHours > 0 && value
+    ? `${Math.round(value / contractHours * 100)}%`
+    : null;
+  return (
+    <div>
+      <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+        {label}
+        {pct && <span className="ml-1 text-pwc-orange">({pct})</span>}
+      </label>
+      <input
+        type="number"
+        value={value || ""}
+        onChange={(e) => onChange?.(Number(e.target.value) || 0)}
+        readOnly={readOnly}
+        className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+          readOnly
+            ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
+            : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
+        }`}
+      />
+    </div>
+  );
+}
+
 // ── Types ──────────────────────────────────────────
 interface ProjectInfo {
   project_code: string;
@@ -674,7 +712,17 @@ export default function BudgetWizardPage() {
         <div>
           {step < 3 && (
             <button
-              onClick={() => setStep(step + 1)}
+              onClick={() => {
+                if (step === 1 && !project.project_code && !project.project_name) {
+                  alert("프로젝트 기본정보를 먼저 입력해주세요.");
+                  return;
+                }
+                if (step === 2 && members.filter(m => m.empno || m.name).length === 0) {
+                  alert("구성원을 1명 이상 등록해주세요.");
+                  return;
+                }
+                setStep(step + 1);
+              }}
               className="px-4 py-2 text-sm border border-pwc-black text-pwc-black rounded hover:bg-pwc-black hover:text-white transition-colors"
             >
               다음 →
@@ -1034,34 +1082,7 @@ function Step1Form({
     </div>
   );
 
-  const NumberField = ({
-    label,
-    value,
-    onChange,
-    readOnly,
-  }: {
-    label: string;
-    value: number;
-    onChange?: (v: number) => void;
-    readOnly?: boolean;
-  }) => (
-    <div>
-      <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-        {label}
-      </label>
-      <input
-        type="number"
-        value={value || ""}
-        onChange={(e) => onChange?.(Number(e.target.value) || 0)}
-        readOnly={readOnly}
-        className={`w-full px-2 py-1.5 text-sm border rounded text-right ${
-          readOnly
-            ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
-            : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
-        }`}
-      />
-    </div>
-  );
+  // NumberField는 컴포넌트 외부에 정의 (아래 NumberFieldComponent 사용)
 
   return (
     <div className="space-y-6">
@@ -1312,51 +1333,61 @@ function Step1Form({
             label="AX/DX 시간"
             value={project.axdx_hours}
             onChange={(v) => pField("axdx_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="QRP 시간"
             value={project.qrp_hours}
             onChange={(v) => pField("qrp_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="RM/CRS/M&T 시간"
             value={project.rm_hours}
             onChange={(v) => pField("rm_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="FLDT-EL 시간"
             value={project.el_hours}
             onChange={(v) => pField("el_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="FLDT-PM 시간"
             value={project.pm_hours}
             onChange={(v) => pField("pm_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="RA-EL/PM 시간"
             value={project.ra_elpm_hours}
             onChange={(v) => pField("ra_elpm_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="Fulcrum 시간"
             value={project.fulcrum_hours}
             onChange={(v) => pField("fulcrum_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="RA-Staff 시간"
             value={project.ra_staff_hours}
             onChange={(v) => pField("ra_staff_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="Specialist 시간"
             value={project.specialist_hours}
             onChange={(v) => pField("specialist_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="출장 시간"
             value={project.travel_hours}
             onChange={(v) => pField("travel_hours", v)}
+            contractHours={project.contract_hours}
           />
           <NumberField
             label="ET Controllable Budget"

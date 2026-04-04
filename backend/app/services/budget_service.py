@@ -238,7 +238,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                     "budget": float(budget_hrs),
                 })
 
-    role_empnos = list({rm["empno"] for rm in role_mappings}) if role_mappings else None
+    role_empnos = list({rm["empno"] for rm in role_mappings if rm["empno"]}) or None
     staff_empnos = list(staff_budget.keys()) if staff_budget else None
 
     # ④ Azure: 단일 패스로 모든 actual 집계
@@ -327,12 +327,12 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                 "el_name": p.el_name,
                 "pm_name": p.pm_name,
                 "template_status": p.template_status or "",
-                "budget": float(budget_by_project.get(p.project_code, 0)),
+                "budget": float(p.contract_hours or 0),
                 "actual": float(actual_map.get(p.project_code, 0)),
                 "progress": round(
                     float(actual_map.get(p.project_code, 0)) /
-                    float(budget_by_project.get(p.project_code, 1) or 1) * 100, 1
-                ),
+                    float(p.contract_hours or 1) * 100, 1
+                ) if (p.contract_hours or 0) > 0 else 0,
             }
             for p in projects
         ],
