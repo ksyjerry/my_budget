@@ -58,9 +58,22 @@ class Project(Base):
     total_budget_hours = Column(Float, default=0)
     template_status = Column(String(50))
     fiscal_start = Column(Date)
+    service_type = Column(String(20), default="AUDIT")
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     client = relationship("Client", back_populates="projects")
     budget_details = relationship("BudgetDetail", back_populates="project")
+
+
+class ServiceTaskMaster(Base):
+    __tablename__ = "service_task_master"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    service_type = Column(String(20), nullable=False, index=True)
+    task_category = Column(String(100))
+    task_name = Column(String(200), nullable=False)
+    budget_unit_type = Column(String(50))
+    sort_order = Column(Integer, default=0)
+    description = Column(String(500))

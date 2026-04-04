@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.models.project import Client, Project
+from app.models.project import Client, Project, ServiceTaskMaster
 from app.models.budget import BudgetDetail
 from app.models.budget_master import (
     BudgetUnitMaster, PeerStatistics, PeerGroupMapping,
@@ -16,6 +16,47 @@ from app.services.budget_service import upsert_project_from_client_data, bulk_in
 from app.api.deps import get_optional_user
 
 router = APIRouter()
+
+# ── Service Types ────────────────────────────────────
+
+SERVICE_TYPES = [
+    {"code": "AUDIT", "name": "감사"},
+    {"code": "AC", "name": "회계자문"},
+    {"code": "IC", "name": "내부통제 (C.SOX PA)"},
+    {"code": "ESG", "name": "ESG"},
+    {"code": "VAL", "name": "Valuation"},
+    {"code": "TRADE", "name": "통상자문"},
+    {"code": "ETC", "name": "기타"},
+]
+
+
+@router.get("/master/service-types")
+def get_service_types():
+    """서비스 분류 목록."""
+    return SERVICE_TYPES
+
+
+@router.get("/master/tasks")
+def get_service_tasks(service_type: str = "AUDIT", db: Session = Depends(get_db)):
+    """분류별 Task 마스터 목록."""
+    rows = (
+        db.query(ServiceTaskMaster)
+        .filter(ServiceTaskMaster.service_type == service_type)
+        .order_by(ServiceTaskMaster.sort_order)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "service_type": r.service_type,
+            "task_category": r.task_category or "",
+            "task_name": r.task_name,
+            "budget_unit_type": r.budget_unit_type or "",
+            "sort_order": r.sort_order,
+            "description": r.description or "",
+        }
+        for r in rows
+    ]
 
 
 # ── Client Search ────────────────────────────────────
@@ -309,6 +350,7 @@ class ProjectCreateRequest(BaseModel):
     total_budget_hours: float = 0
     template_status: Optional[str] = "작성중"
     fiscal_start: Optional[str] = None  # "2025-04"
+    service_type: Optional[str] = "AUDIT"
 
 
 class MemberRequest(BaseModel):
@@ -452,6 +494,7 @@ def get_project_info(project_code: str, db: Session = Depends(get_db)):
             "travel_hours": project.travel_hours,
             "total_budget_hours": project.total_budget_hours,
             "template_status": project.template_status,
+            "service_type": project.service_type or "AUDIT",
         },
         "client": {
             "client_code": client.client_code if client else "",

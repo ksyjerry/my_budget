@@ -80,6 +80,7 @@ interface ProjectInfo {
   travel_hours: number;
   total_budget_hours: number;
   template_status: string;
+  service_type: string;
 }
 
 interface ClientInfo {
@@ -160,6 +161,7 @@ export default function BudgetWizardPage() {
     travel_hours: 0,
     total_budget_hours: 0,
     template_status: "작성중",
+    service_type: "AUDIT",
   });
   const [client, setClient] = useState<ClientInfo>({
     client_code: "",
@@ -205,15 +207,34 @@ export default function BudgetWizardPage() {
       .catch(() => {});
   }, [projectCode, isNew]);
 
-  // Load budget units master
+  // Load budget units master — 서비스 분류에 따라 다른 소스 사용
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/budget/master/units`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.units) setBudgetUnits(data.units);
-      })
-      .catch(() => {});
-  }, []);
+    if (project.service_type === "AUDIT") {
+      // 감사: 기존 budget_unit_master 사용
+      fetch(`${API_BASE}/api/v1/budget/master/units`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.units) setBudgetUnits(data.units);
+        })
+        .catch(() => {});
+    } else {
+      // 비감사: service_task_master에서 Task 목록 로드
+      fetch(`${API_BASE}/api/v1/budget/master/tasks?service_type=${project.service_type}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setBudgetUnits(
+              data.map((t: { task_category: string; task_name: string; sort_order: number }) => ({
+                category: t.task_category || project.service_type,
+                unit_name: t.task_name,
+                sort_order: t.sort_order,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, [project.service_type]);
 
   // Load template rows when entering Step 3
   useEffect(() => {
@@ -1220,6 +1241,7 @@ function Step1Form({
               travel_hours: p.travel_hours as number,
               total_budget_hours: p.total_budget_hours as number,
               template_status: (p.template_status as string) || "작성중",
+              service_type: (p.service_type as string) || "AUDIT",
             });
             // 클라이언트 코드도 연동
             if (p.client_code) {
@@ -1247,6 +1269,24 @@ function Step1Form({
           )}
         </div>
         <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              서비스 분류 <span className="text-pwc-red">*</span>
+            </label>
+            <select
+              value={project.service_type}
+              onChange={(e) => pField("service_type", e.target.value)}
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+            >
+              <option value="AUDIT">감사</option>
+              <option value="AC">회계자문</option>
+              <option value="IC">내부통제 (C.SOX PA)</option>
+              <option value="ESG">ESG</option>
+              <option value="VAL">Valuation</option>
+              <option value="TRADE">통상자문</option>
+              <option value="ETC">기타</option>
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
               Project Code
