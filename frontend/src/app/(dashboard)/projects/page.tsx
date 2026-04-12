@@ -9,6 +9,7 @@ import { useApi, buildQuery, useFilterOptions } from "@/hooks/useApi";
 import type { ProjectListItem, ProjectDetail } from "@/hooks/useApi";
 import { CrossFilterProvider, useCrossFilter, applyFilters } from "@/lib/cross-filter";
 import { getCategoryOrder } from "@/lib/budget-constants";
+import { gradeRank } from "@/lib/grade";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 
 // --------------- Empty Defaults ---------------
@@ -504,6 +505,14 @@ export default function ProjectsPage() {
           totalRemaining += p.remaining || 0;
         }
       }
+
+      // grade 순으로 정렬 (P>MD>D>SM>M>SA>A>AA), 같은 grade 는 budget 큰 순
+      people.sort((a, b) => {
+        const ga = gradeRank(a.rank);
+        const gb = gradeRank(b.rank);
+        if (ga !== gb) return ga - gb;
+        return (b.budget || 0) - (a.budget || 0);
+      });
 
       units.push({
         unitName,

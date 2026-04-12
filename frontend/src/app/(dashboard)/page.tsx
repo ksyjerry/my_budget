@@ -6,6 +6,7 @@ import KPICard from "@/components/ui/KPICard";
 import HorizontalBarChart from "@/components/charts/HorizontalBarChart";
 import DonutChart from "@/components/charts/DonutChart";
 import FilterBar from "@/components/filters/FilterBar";
+import { gradeRank } from "@/lib/grade";
 
 // ── Helper Components ──────────────────────────────
 function ProgressBadge({ value }: { value: number }) {
@@ -105,18 +106,25 @@ function OverviewInner() {
     }));
   }, [rawElpmQrp]);
 
-  // Map API staff_time to table format
+  // Map API staff_time to table format — grade 순으로 정렬 (P>MD>D>SM>M>SA>A>AA)
   const staffTimeRows = useMemo(() => {
-    return rawStaffTime.map((r) => ({
-      empno: r.empno,
-      fldt_group: "",
-      division: r.department,
-      name: `${r.emp_name}(${r.empno})`,
-      grade: r.grade,
-      budget: r.budget,
-      actual: r.actual,
-      progress: r.progress,
-    }));
+    return rawStaffTime
+      .map((r) => ({
+        empno: r.empno,
+        fldt_group: "",
+        division: r.department,
+        name: `${r.emp_name}(${r.empno})`,
+        grade: r.grade,
+        budget: r.budget,
+        actual: r.actual,
+        progress: r.progress,
+      }))
+      .sort((a, b) => {
+        const ga = gradeRank(a.grade);
+        const gb = gradeRank(b.grade);
+        if (ga !== gb) return ga - gb;
+        return (b.budget || 0) - (a.budget || 0);
+      });
   }, [rawStaffTime]);
 
   const budgetUnits = rawBudgetUnits;
