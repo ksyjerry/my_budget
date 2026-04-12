@@ -27,8 +27,9 @@ interface TrackingProject {
   revenue: number;
   budget_hours: number;
   actual_hours: number;
+  budget_cost: number;
   std_cost: number;
-  em: number;
+  cost_diff: number;
   progress_hours: number;
   progress_cost: number;
 }
@@ -38,17 +39,18 @@ interface MonthlyRow {
   revenue: number;
   budget_hours: number;
   actual_hours: number;
+  budget_cost: number;
   std_cost: number;
-  em: number;
+  cost_diff: number;
 }
 
 interface KPI {
   total_revenue: number;
   total_budget_hours: number;
   total_actual_hours: number;
+  total_budget_cost: number;
   total_std_cost: number;
-  total_em: number;
-  em_margin: number;
+  total_cost_diff: number;
   project_count: number;
   year_month?: string;
 }
@@ -84,7 +86,10 @@ function ProgressBadge({ value }: { value: number }) {
   return <span className={`font-semibold ${color}`}>{value.toFixed(0)}%</span>;
 }
 
-function EmCell({ value }: { value: number }) {
+function CostDiffCell({ value }: { value: number }) {
+  // 원가차이 = Budget Cost - Actual Cost
+  // 양수(>0) = 원가 절감 (Budget 여유) → 초록
+  // 음수(<0) = 원가 초과 → 빨강
   if (value === 0) return <span className="text-pwc-gray-600">-</span>;
   const color = value < 0 ? "text-pwc-red" : "text-pwc-green";
   return <span className={`font-semibold ${color}`}>{fmtKRW(value)}</span>;
@@ -297,18 +302,19 @@ export default function BudgetTrackingPage() {
 
       {/* KPI Cards */}
       {kpi && (
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-7 gap-3">
           <KpiCard label="프로젝트" value={kpi.project_count.toString()} />
-          <KpiCard label="Total Revenue" value={fmtKRW(kpi.total_revenue)} highlight />
-          <KpiCard label="Std Cost" value={fmtKRW(kpi.total_std_cost)} />
+          <KpiCard label="계약금액" value={fmtKRW(kpi.total_revenue)} highlight />
+          <KpiCard label="Budget Cost" value={fmtKRW(kpi.total_budget_cost)} />
+          <KpiCard label="Actual Cost" value={fmtKRW(kpi.total_std_cost)} />
           <KpiCard
-            label="EM"
-            value={fmtKRW(kpi.total_em)}
+            label="원가차이"
+            value={fmtKRW(kpi.total_cost_diff)}
             highlight
-            color={kpi.total_em < 0 ? "text-pwc-red" : "text-pwc-green"}
+            color={kpi.total_cost_diff < 0 ? "text-pwc-red" : "text-pwc-green"}
           />
-          <KpiCard label="Budget Hourours" value={fmtHours(kpi.total_budget_hours)} />
-          <KpiCard label="Actual Hourours" value={fmtHours(kpi.total_actual_hours)} />
+          <KpiCard label="Budget Hour" value={fmtHours(kpi.total_budget_hours)} />
+          <KpiCard label="Actual Hour" value={fmtHours(kpi.total_actual_hours)} />
         </div>
       )}
 
@@ -323,9 +329,10 @@ export default function BudgetTrackingPage() {
               <tr>
                 <th className="px-3 py-2 text-left font-semibold text-pwc-gray-600">프로젝트</th>
                 <th className="px-3 py-2 text-left font-semibold text-pwc-gray-600 w-20">EL</th>
-                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Revenue</th>
-                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Std Cost</th>
-                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">EM</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">계약금액</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Budget Cost</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Actual Cost</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">원가차이</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Budget Hour</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Actual Hour</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-16">진행률</th>
@@ -334,13 +341,13 @@ export default function BudgetTrackingPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-pwc-gray-600">
+                  <td colSpan={9} className="px-3 py-8 text-center text-pwc-gray-600">
                     로딩 중...
                   </td>
                 </tr>
               ) : projects.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-pwc-gray-600">
+                  <td colSpan={9} className="px-3 py-8 text-center text-pwc-gray-600">
                     데이터가 없습니다.
                   </td>
                 </tr>
@@ -362,9 +369,10 @@ export default function BudgetTrackingPage() {
                       </td>
                       <td className="px-3 py-2">{p.el_name}</td>
                       <td className="px-3 py-2 text-right">{fmtKRW(p.revenue)}</td>
+                      <td className="px-3 py-2 text-right">{fmtKRW(p.budget_cost)}</td>
                       <td className="px-3 py-2 text-right">{fmtKRW(p.std_cost)}</td>
                       <td className="px-3 py-2 text-right">
-                        <EmCell value={p.em} />
+                        <CostDiffCell value={p.cost_diff} />
                       </td>
                       <td className="px-3 py-2 text-right">{fmtHours(p.budget_hours)}</td>
                       <td className="px-3 py-2 text-right">{fmtHours(p.actual_hours)}</td>
@@ -392,14 +400,16 @@ export default function BudgetTrackingPage() {
             <MonthlyTrendChart
               data={monthly.map((m) => ({
                 month: `${m.year_month.slice(0, 4)}년 ${parseInt(m.year_month.slice(4, 6), 10)}월`,
-                Revenue: m.revenue,
-                "Std Cost": m.std_cost,
+                "계약금액": m.revenue,
+                "Budget Cost": m.budget_cost,
+                "Actual Cost": m.std_cost,
               }))}
               series={[
-                { key: "Revenue", label: "Revenue", color: "#D04A02" },
-                { key: "Std Cost", label: "Std Cost", color: "#6D6D6D" },
+                { key: "계약금액", label: "계약금액", color: "#D04A02" },
+                { key: "Budget Cost", label: "Budget Cost", color: "#22992E" },
+                { key: "Actual Cost", label: "Actual Cost", color: "#6D6D6D" },
               ]}
-              height={320}
+              height={340}
             />
           </div>
         </div>

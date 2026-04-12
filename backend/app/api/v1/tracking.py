@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.models.project import Project
 from app.models.budget_master import PartnerAccessConfig
 from app.services import azure_service
+from app.services.em_rate import calc_cost
 from app.api.deps import get_optional_user
 
 logger = logging.getLogger(__name__)
@@ -145,13 +146,13 @@ def get_tracking_projects(
         if tba:
             project_target_ym[pc] = _to_dashed(tba[1])  # tba[1] = year_month
 
-    # 한 번의 쿼리로 모든 프로젝트의 누적 Budget Hour 조회
-    cum_budget_map: dict[str, float] = {}
+    # 한 번의 쿼리로 모든 프로젝트의 누적 Budget Hour + Budget Cost 조회
+    cum_budget_hours_map: dict[str, float] = {}
+    cum_budget_cost_map: dict[str, float] = {}
     if project_target_ym:
-        # 단순화: 전체 필터 프로젝트의 budget_details를 한번에 가져온 뒤 Python 필터
         bd_rows = db.execute(
             text(
-                "SELECT project_code, year_month, budget_hours "
+                "SELECT project_code, year_month, budget_hours, grade "
                 "FROM budget_details "
                 "WHERE project_code = ANY(:codes)"
             ),
@@ -161,16 +162,18 @@ def get_tracking_projects(
             pc = bd[0]
             bd_ym = bd[1] or ""
             hrs = float(bd[2] or 0)
+            grade = bd[3] or ""
             target_ym = project_target_ym.get(pc)
             if target_ym and bd_ym and bd_ym <= target_ym:
-                cum_budget_map[pc] = cum_budget_map.get(pc, 0.0) + hrs
+                cum_budget_hours_map[pc] = cum_budget_hours_map.get(pc, 0.0) + hrs
+                cum_budget_cost_map[pc] = cum_budget_cost_map.get(pc, 0.0) + calc_cost(grade, bd_ym, hrs)
 
     rows = []
     total_revenue = 0.0
     total_budget_hours = 0.0
     total_actual_hours = 0.0
+    total_budget_cost = 0.0
     total_std_cost = 0.0
-    total_em = 0.0
 
     for pc in filtered_codes:
         tba = tba_map.get(pc)
@@ -179,15 +182,16 @@ def get_tracking_projects(
             continue
 
         if tba:
-            _, ym, rev, _bh_tba, ah, sc, em = tba
+            _, ym, rev, _bh_tba, ah, sc, _em = tba
             rev = float(rev or 0)
             ah = float(ah or 0)
             sc = float(sc or 0)
-            em = float(em or 0)
-            # Budget Hour는 budget_details에서 누적 계산 (없으면 TBA 값으로 fallback)
-            bh = cum_budget_map.get(pc, float(_bh_tba or 0))
+            bh = cum_budget_hours_map.get(pc, float(_bh_tba or 0))
+            bc = cum_budget_cost_map.get(pc, 0.0)
         else:
-            ym, rev, bh, ah, sc, em = "", 0, 0, 0, 0, 0
+            ym, rev, bh, ah, sc, bc = "", 0, 0, 0, 0, 0
+
+        cost_diff = bc - sc  # Budget Cost - Actual Cost (양수 = 절감)
 
         rows.append({
             "project_code": pc,
@@ -198,19 +202,20 @@ def get_tracking_projects(
             "revenue": rev,
             "budget_hours": bh,
             "actual_hours": ah,
+            "budget_cost": bc,
             "std_cost": sc,
-            "em": em,
+            "cost_diff": cost_diff,
             "progress_hours": round(ah / bh * 100, 1) if bh else 0,
-            "progress_cost": round(sc / rev * 100, 1) if rev else 0,
+            "progress_cost": round(sc / bc * 100, 1) if bc else 0,
         })
 
         total_revenue += rev
         total_budget_hours += bh
         total_actual_hours += ah
+        total_budget_cost += bc
         total_std_cost += sc
-        total_em += em
 
-    rows.sort(key=lambda x: (-x["revenue"], -x["em"]))
+    rows.sort(key=lambda x: (-x["revenue"], -x["cost_diff"]))
 
     # 마지막 동기화 시각
     last_sync_row = db.execute(
@@ -223,9 +228,9 @@ def get_tracking_projects(
             "total_revenue": total_revenue,
             "total_budget_hours": total_budget_hours,
             "total_actual_hours": total_actual_hours,
+            "total_budget_cost": total_budget_cost,
             "total_std_cost": total_std_cost,
-            "total_em": total_em,
-            "em_margin": round(total_em / total_revenue * 100, 1) if total_revenue else 0,
+            "total_cost_diff": total_budget_cost - total_std_cost,
             "project_count": len(rows),
             "year_month": year_month or (available_yms[0] if available_yms else ""),
         },
@@ -266,17 +271,25 @@ def get_tracking_project_detail(
         {"pc": project_code},
     ).fetchall()
 
-    # budget_details에서 월별 budget_hours 합계 → 누적 계산용
+    # budget_details에서 월별 budget_hours + grade → 원가 계산
     bd_rows = db.execute(
         text(
-            "SELECT year_month, SUM(budget_hours) "
-            "FROM budget_details WHERE project_code = :pc "
-            "GROUP BY year_month"
+            "SELECT year_month, budget_hours, grade "
+            "FROM budget_details WHERE project_code = :pc"
         ),
         {"pc": project_code},
     ).fetchall()
-    # "2026-01" 포맷의 월별 합계
-    bd_monthly_map = {bd[0]: float(bd[1] or 0) for bd in bd_rows if bd[0]}
+    # 월별 (hours, cost) 집계
+    bd_monthly_hours: dict[str, float] = {}
+    bd_monthly_cost: dict[str, float] = {}
+    for bd in bd_rows:
+        ym = bd[0] or ""
+        hrs = float(bd[1] or 0)
+        grade = bd[2] or ""
+        if not ym:
+            continue
+        bd_monthly_hours[ym] = bd_monthly_hours.get(ym, 0.0) + hrs
+        bd_monthly_cost[ym] = bd_monthly_cost.get(ym, 0.0) + calc_cost(grade, ym, hrs)
 
     def _to_dashed(ym: str) -> str:
         return f"{ym[:4]}-{ym[4:6]}" if len(ym) == 6 else ym
@@ -285,16 +298,19 @@ def get_tracking_project_detail(
     for r in rows:
         ym = r[0]
         target_dashed = _to_dashed(ym)
-        # 해당 월 이하의 budget_details 합산 = 누적 Budget Hour
-        cum_budget = sum(v for k, v in bd_monthly_map.items() if k and k <= target_dashed)
+        # 해당 월 이하의 누적 합산
+        cum_budget_hours = sum(v for k, v in bd_monthly_hours.items() if k and k <= target_dashed)
+        cum_budget_cost = sum(v for k, v in bd_monthly_cost.items() if k and k <= target_dashed)
+        std_cost = float(r[5] or 0)
         monthly.append({
             "year_month": ym,
             "yearly": r[1] or "",
             "revenue": float(r[2] or 0),
-            "budget_hours": cum_budget if cum_budget > 0 else float(r[3] or 0),
+            "budget_hours": cum_budget_hours if cum_budget_hours > 0 else float(r[3] or 0),
             "actual_hours": float(r[4] or 0),
-            "std_cost": float(r[5] or 0),
-            "em": float(r[6] or 0),
+            "budget_cost": cum_budget_cost,
+            "std_cost": std_cost,
+            "cost_diff": cum_budget_cost - std_cost,
             "project_code": project_code,
         })
 

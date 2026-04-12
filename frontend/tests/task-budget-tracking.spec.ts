@@ -44,14 +44,13 @@ test.describe("Budget Tracking — Partner Only", () => {
     await login(page, "120507");
 
     await page.goto("/projects/tracking");
-    await page.waitForSelector("text=Budget Tracking", { timeout: 15000 });
-    await page.waitForTimeout(5000); // wait for API + KPI render
+    await page.waitForTimeout(6000); // wait for API + KPI render
 
     // KPI 카드 확인 (긴 timeout)
-    await expect(page.locator("text=Total Revenue").first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator("text=Std Cost").first()).toBeVisible();
-    const emVisible = await page.locator("text=EM").first().isVisible();
-    expect(emVisible).toBe(true);
+    await expect(page.locator("text=계약금액").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=Budget Cost").first()).toBeVisible();
+    await expect(page.locator("text=Actual Cost").first()).toBeVisible();
+    await expect(page.locator("text=원가차이").first()).toBeVisible();
   });
 
   test("API — Non-partner receives 403 from /tracking/projects", async ({ request }) => {
