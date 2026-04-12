@@ -27,9 +27,33 @@ def _require_admin(db: Session, user: dict | None):
 
 
 @router.post("/employees")
-def sync_employees_endpoint(db: Session = Depends(get_db)):
+def sync_employees_endpoint(
+    db: Session = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
+):
+    """Azure → Postgres 직원 동기화 (admin only)."""
+    _require_admin(db, user)
+    t0 = time.time()
     count = sync_employees(db)
-    return {"message": f"{count}명 동기화 완료"}
+    elapsed_ms = int((time.time() - t0) * 1000)
+    return {"synced": count, "elapsed_ms": elapsed_ms, "message": "ok"}
+
+
+@router.get("/employees/status")
+def sync_employees_status(
+    db: Session = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
+):
+    """마지막 Azure 직원 동기화 상태 조회 (인증 필요)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    from app.models.employee import Employee
+    total = db.query(func.count(Employee.empno)).scalar() or 0
+    last_sync = db.query(func.max(Employee.synced_at)).scalar()
+    return {
+        "total_employees": total,
+        "last_sync": last_sync.isoformat() if last_sync else None,
+    }
 
 
 @router.post("/teams")
