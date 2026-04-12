@@ -21,6 +21,7 @@ class Client(Base):
     internal_control = Column(String(100))
     initial_audit = Column(String(50))
     group_code = Column(String(10))
+    synced_at = Column(DateTime, nullable=True)  # Azure 동기화 시각 (수동 입력분은 NULL)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
