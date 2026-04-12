@@ -96,7 +96,6 @@ export default function BudgetTrackingPage() {
   const [projects, setProjects] = useState<TrackingProject[]>([]);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [monthly, setMonthly] = useState<MonthlyRow[]>([]);
-  const [search, setSearch] = useState("");
 
   // Filters
   const [availableYms, setAvailableYms] = useState<string[]>([]);
@@ -221,17 +220,6 @@ export default function BudgetTrackingPage() {
     load();
   }, [selectedCode]);
 
-  const filtered = useMemo(() => {
-    if (!search) return projects;
-    const s = search.toLowerCase();
-    return projects.filter(
-      (p) =>
-        p.project_name.toLowerCase().includes(s) ||
-        p.project_code.includes(s) ||
-        p.el_name.includes(search)
-    );
-  }, [projects, search]);
-
   if (accessDenied) {
     return (
       <div className="p-6">
@@ -333,19 +321,10 @@ export default function BudgetTrackingPage() {
             highlight
             color={kpi.total_em < 0 ? "text-pwc-red" : "text-pwc-green"}
           />
-          <KpiCard label="Budget Hours" value={fmtHours(kpi.total_budget_hours)} />
-          <KpiCard label="Actual Hours" value={fmtHours(kpi.total_actual_hours)} />
+          <KpiCard label="Budget Hourours" value={fmtHours(kpi.total_budget_hours)} />
+          <KpiCard label="Actual Hourours" value={fmtHours(kpi.total_actual_hours)} />
         </div>
       )}
-
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="프로젝트명, 코드, EL명 검색..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-md px-3 py-2 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
-      />
 
       {/* Projects Table */}
       <div className="bg-white rounded-lg border border-pwc-gray-100 overflow-hidden">
@@ -361,8 +340,8 @@ export default function BudgetTrackingPage() {
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Revenue</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">Std Cost</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-24">EM</th>
-                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Budget H</th>
-                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Actual H</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Budget Hour</th>
+                <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-20">Actual Hour</th>
                 <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600 w-16">진행률</th>
               </tr>
             </thead>
@@ -373,14 +352,14 @@ export default function BudgetTrackingPage() {
                     로딩 중...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : projects.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-pwc-gray-600">
                     데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
-                filtered.map((p) => {
+                projects.map((p) => {
                   const selected = selectedCode === p.project_code;
                   return (
                     <tr
@@ -431,8 +410,8 @@ export default function BudgetTrackingPage() {
                   <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Revenue</th>
                   <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Std Cost</th>
                   <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">EM</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Budget H</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Actual H</th>
+                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Budget Hour</th>
+                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Actual Hour</th>
                 </tr>
               </thead>
               <tbody>

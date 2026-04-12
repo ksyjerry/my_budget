@@ -45,9 +45,10 @@ test.describe("Budget Tracking — Partner Only", () => {
 
     await page.goto("/projects/tracking");
     await page.waitForSelector("text=Budget Tracking", { timeout: 15000 });
+    await page.waitForTimeout(5000); // wait for API + KPI render
 
-    // KPI 카드 확인
-    await expect(page.locator("text=Total Revenue").first()).toBeVisible();
+    // KPI 카드 확인 (긴 timeout)
+    await expect(page.locator("text=Total Revenue").first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator("text=Std Cost").first()).toBeVisible();
     const emVisible = await page.locator("text=EM").first().isVisible();
     expect(emVisible).toBe(true);

@@ -128,6 +128,43 @@ def get_tracking_projects(
 
     tba_map = {r[0]: r for r in tba_rows}
 
+    # 기준 연월까지 누적 Budget Hour 계산 (budget_details 기반)
+    # budget_details.year_month 포맷: "2026-01"
+    # tba year_month 포맷: "202601"
+    def _to_dashed(ym: str) -> str:
+        """202601 → 2026-01"""
+        if len(ym) == 6:
+            return f"{ym[:4]}-{ym[4:6]}"
+        return ym
+
+    # 프로젝트별로 다른 기준 연월을 사용할 수 있으므로 한 번의 쿼리로 처리
+    # 각 프로젝트의 기준 연월 수집
+    project_target_ym: dict[str, str] = {}
+    for pc in filtered_codes:
+        tba = tba_map.get(pc)
+        if tba:
+            project_target_ym[pc] = _to_dashed(tba[1])  # tba[1] = year_month
+
+    # 한 번의 쿼리로 모든 프로젝트의 누적 Budget Hour 조회
+    cum_budget_map: dict[str, float] = {}
+    if project_target_ym:
+        # 단순화: 전체 필터 프로젝트의 budget_details를 한번에 가져온 뒤 Python 필터
+        bd_rows = db.execute(
+            text(
+                "SELECT project_code, year_month, budget_hours "
+                "FROM budget_details "
+                "WHERE project_code = ANY(:codes)"
+            ),
+            {"codes": filtered_codes},
+        ).fetchall()
+        for bd in bd_rows:
+            pc = bd[0]
+            bd_ym = bd[1] or ""
+            hrs = float(bd[2] or 0)
+            target_ym = project_target_ym.get(pc)
+            if target_ym and bd_ym and bd_ym <= target_ym:
+                cum_budget_map[pc] = cum_budget_map.get(pc, 0.0) + hrs
+
     rows = []
     total_revenue = 0.0
     total_budget_hours = 0.0
@@ -142,12 +179,13 @@ def get_tracking_projects(
             continue
 
         if tba:
-            _, ym, rev, bh, ah, sc, em = tba
+            _, ym, rev, _bh_tba, ah, sc, em = tba
             rev = float(rev or 0)
-            bh = float(bh or 0)
             ah = float(ah or 0)
             sc = float(sc or 0)
             em = float(em or 0)
+            # Budget Hour는 budget_details에서 누적 계산 (없으면 TBA 값으로 fallback)
+            bh = cum_budget_map.get(pc, float(_bh_tba or 0))
         else:
             ym, rev, bh, ah, sc, em = "", 0, 0, 0, 0, 0
 
@@ -227,19 +265,38 @@ def get_tracking_project_detail(
         ),
         {"pc": project_code},
     ).fetchall()
-    monthly = [
-        {
-            "year_month": r[0],
+
+    # budget_details에서 월별 budget_hours 합계 → 누적 계산용
+    bd_rows = db.execute(
+        text(
+            "SELECT year_month, SUM(budget_hours) "
+            "FROM budget_details WHERE project_code = :pc "
+            "GROUP BY year_month"
+        ),
+        {"pc": project_code},
+    ).fetchall()
+    # "2026-01" 포맷의 월별 합계
+    bd_monthly_map = {bd[0]: float(bd[1] or 0) for bd in bd_rows if bd[0]}
+
+    def _to_dashed(ym: str) -> str:
+        return f"{ym[:4]}-{ym[4:6]}" if len(ym) == 6 else ym
+
+    monthly = []
+    for r in rows:
+        ym = r[0]
+        target_dashed = _to_dashed(ym)
+        # 해당 월 이하의 budget_details 합산 = 누적 Budget Hour
+        cum_budget = sum(v for k, v in bd_monthly_map.items() if k and k <= target_dashed)
+        monthly.append({
+            "year_month": ym,
             "yearly": r[1] or "",
             "revenue": float(r[2] or 0),
-            "budget_hours": float(r[3] or 0),
+            "budget_hours": cum_budget if cum_budget > 0 else float(r[3] or 0),
             "actual_hours": float(r[4] or 0),
             "std_cost": float(r[5] or 0),
             "em": float(r[6] or 0),
             "project_code": project_code,
-        }
-        for r in rows
-    ]
+        })
 
     return {
         "project": {
