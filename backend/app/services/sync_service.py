@@ -117,3 +117,48 @@ def sync_actual_data(db: Session, project_codes: list[str]) -> int:
 
     db.commit()
     return count
+
+
+def sync_clients(db: Session) -> int:
+    """Azure BI_STAFFREPORT_PRJT_V 의 진행중 프로젝트에서 client_code (PRJTCD 앞 5자리) 를 추출하여
+    Postgres clients 테이블에 UPSERT.
+
+    - 모든 LoS 포함 (감사 + 비감사)
+    - 기존 row: client_name 과 synced_at 만 갱신, 상세 필드는 보존
+    - 신규 row: 상세 필드는 NULL 로 INSERT
+    """
+    from app.models.project import Client
+
+    with _get_azure() as conn:
+        cursor = conn.cursor(as_dict=True)
+        cursor.execute("""
+            SELECT
+                LEFT(PRJTCD, 5) AS CLIENT_CODE,
+                MAX(CLIENTNM)   AS CLIENT_NAME,
+                MAX(SHRTNM)     AS SHORT_NAME
+            FROM BI_STAFFREPORT_PRJT_V
+            WHERE CLOSDV = N'진행'
+            GROUP BY LEFT(PRJTCD, 5)
+        """)
+        rows = cursor.fetchall()
+
+    now = datetime.now()
+    count = 0
+    for row in rows:
+        code = (row.get("CLIENT_CODE") or "").strip()
+        if not code:
+            continue
+        name = (row.get("CLIENT_NAME") or row.get("SHORT_NAME") or "").strip()
+
+        client = db.query(Client).filter(Client.client_code == code).first()
+        if not client:
+            client = Client(client_code=code, client_name=name, synced_at=now)
+            db.add(client)
+        else:
+            if name:
+                client.client_name = name
+            client.synced_at = now
+        count += 1
+
+    db.commit()
+    return count
