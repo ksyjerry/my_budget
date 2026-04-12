@@ -95,6 +95,7 @@ interface ClientInfo {
   subsidiary_count: string;
   internal_control: string;
   initial_audit: string;
+  needs_detail?: boolean;
 }
 
 interface Member {
@@ -845,7 +846,16 @@ function ClientSearchModal({
                     onClick={() => { onSelect(c); onClose(); }}
                   >
                     <td className="px-4 py-2.5 font-mono text-xs">{c.client_code}</td>
-                    <td className="px-4 py-2.5">{c.client_name}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span>{c.client_name}</span>
+                        {c.needs_detail && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-pwc-gray-100 text-pwc-gray-600">
+                            정보 미입력
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-pwc-gray-600">{c.industry}</td>
                     <td className="px-4 py-2.5 text-xs text-pwc-gray-600">{c.listing_status}</td>
                   </tr>
