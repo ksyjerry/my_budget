@@ -126,6 +126,29 @@ interface TemplateRow {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+// ── Grade 정렬 유틸 ────────────────────────────────
+// 순서: P > MD > D > SM > M > SA > A > AA
+const GRADE_ORDER = ["P", "MD", "D", "SM", "M", "SA", "A", "AA"];
+const GRADE_ALIASES: Record<string, string> = {
+  "P": "P", "Partner": "P", "Ptr": "P",
+  "MD": "MD", "Managing Director": "MD",
+  "D": "D", "Dir": "D", "Director": "D",
+  "SM": "SM", "Sr.Manager": "SM", "Sr Manager": "SM", "Senior Manager": "SM", "Senior-Manager": "SM",
+  "M": "M", "Manager": "M", "Manager 1": "M", "Manager 2": "M",
+  "SA": "SA", "SA1": "SA", "SA2": "SA",
+  "Sr.Associate": "SA", "Senior Associate": "SA", "Senior-Associate": "SA",
+  "Senior-Associate 1": "SA", "Senior-Associate 2": "SA",
+  "A": "A", "Associate": "A",
+  "AA": "AA", "A.Associate": "AA", "Assistant-Associate": "AA", "Assistant Associate": "AA",
+};
+function gradeRank(raw: string | undefined | null): number {
+  if (!raw) return 999;
+  const normalized = GRADE_ALIASES[raw.trim()];
+  if (!normalized) return 999;
+  const idx = GRADE_ORDER.indexOf(normalized);
+  return idx === -1 ? 999 : idx;
+}
+
 // ── Main Component ─────────────────────────────────
 export default function BudgetWizardPage() {
   const params = useParams();
@@ -1561,8 +1584,17 @@ function Step2Members({
   removeMember: (idx: number) => void;
   updateMember: (idx: number, field: keyof Member, value: string | number) => void;
 }) {
-  const fldtMembers = members.filter((m) => m.role === "FLDT 구성원");
-  const supportMembers = members.filter((m) => m.role === "지원 ET 구성원");
+  // 원본 index 를 보존한 채 grade 순으로 정렬 (state 업데이트는 originalIdx 사용)
+  const sortedFldt = members
+    .map((m, originalIdx) => ({ m, originalIdx }))
+    .filter(({ m }) => m.role === "FLDT 구성원")
+    .sort((a, b) => gradeRank(a.m.grade) - gradeRank(b.m.grade));
+  const sortedSupport = members
+    .map((m, originalIdx) => ({ m, originalIdx }))
+    .filter(({ m }) => m.role === "지원 ET 구성원")
+    .sort((a, b) => gradeRank(a.m.grade) - gradeRank(b.m.grade));
+  const fldtMembers = sortedFldt.map(({ m }) => m);
+  const supportMembers = sortedSupport.map(({ m }) => m);
 
   return (
     <div className="space-y-6">
@@ -1603,15 +1635,14 @@ function Step2Members({
               </tr>
             </thead>
             <tbody>
-              {members.map((m, idx) => {
-                if (m.role !== "FLDT 구성원") return null;
+              {sortedFldt.map(({ m, originalIdx: idx }, i) => {
                 return (
                   <tr
                     key={idx}
                     className="border-t border-pwc-gray-100"
                   >
                     <td className="px-3 py-1.5 text-xs text-pwc-gray-600">
-                      {fldtMembers.indexOf(m) + 1}
+                      {i + 1}
                     </td>
                     <td className="px-3 py-1.5">
                       <EmployeeSearch
@@ -1696,15 +1727,14 @@ function Step2Members({
               </tr>
             </thead>
             <tbody>
-              {members.map((m, idx) => {
-                if (m.role !== "지원 ET 구성원") return null;
+              {sortedSupport.map(({ m, originalIdx: idx }, i) => {
                 return (
                   <tr
                     key={idx}
                     className="border-t border-pwc-gray-100"
                   >
                     <td className="px-3 py-1.5 text-xs text-pwc-gray-600">
-                      {supportMembers.indexOf(m) + 1}
+                      {i + 1}
                     </td>
                     <td className="px-3 py-1.5">
                       <input
@@ -2315,11 +2345,13 @@ function Step3Template({
                       className="w-full px-1 py-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer"
                     >
                       <option value="">선택</option>
-                      {members.map((m) => (
-                        <option key={`${m.empno}-${m.name}`} value={m.empno}>
-                          {m.name}{m.empno ? ` (${m.empno})` : ""}
-                        </option>
-                      ))}
+                      {[...members]
+                        .sort((a, b) => gradeRank(a.grade) - gradeRank(b.grade))
+                        .map((m) => (
+                          <option key={`${m.empno}-${m.name}`} value={m.empno}>
+                            {m.name}{m.empno ? ` (${m.empno})` : ""}
+                          </option>
+                        ))}
                     </select>
                   </td>
                   {/* 직급 */}
