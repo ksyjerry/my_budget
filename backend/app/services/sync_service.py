@@ -4,6 +4,7 @@ from datetime import datetime
 
 from app.models.employee import Employee, Team, Grade
 from app.models.actual import ActualDetail
+from app.models.project import Client
 
 
 def _get_azure():
@@ -127,8 +128,6 @@ def sync_clients(db: Session) -> int:
     - 기존 row: client_name 과 synced_at 만 갱신, 상세 필드는 보존
     - 신규 row: 상세 필드는 NULL 로 INSERT
     """
-    from app.models.project import Client
-
     with _get_azure() as conn:
         cursor = conn.cursor(as_dict=True)
         cursor.execute("""
