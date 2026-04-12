@@ -14,7 +14,7 @@ from app.db.session import get_db
 from app.models.project import Project
 from app.models.budget_master import PartnerAccessConfig
 from app.services import azure_service
-from app.services.em_rate import calc_cost
+from app.services.em_rate import calc_cost, calc_cost_by_code
 from app.api.deps import get_optional_user
 
 logger = logging.getLogger(__name__)
@@ -149,6 +149,8 @@ def get_tracking_projects(
     # 한 번의 쿼리로 모든 프로젝트의 누적 Budget Hour + Budget Cost 조회
     cum_budget_hours_map: dict[str, float] = {}
     cum_budget_cost_map: dict[str, float] = {}
+    # 프로젝트별 최대 budget_details 월(= 전체 대비 현재까지의 비율 계산용)
+    total_budget_hours_map: dict[str, float] = {}
     if project_target_ym:
         bd_rows = db.execute(
             text(
@@ -164,9 +166,43 @@ def get_tracking_projects(
             hrs = float(bd[2] or 0)
             grade = bd[3] or ""
             target_ym = project_target_ym.get(pc)
+            total_budget_hours_map[pc] = total_budget_hours_map.get(pc, 0.0) + hrs
             if target_ym and bd_ym and bd_ym <= target_ym:
                 cum_budget_hours_map[pc] = cum_budget_hours_map.get(pc, 0.0) + hrs
                 cum_budget_cost_map[pc] = cum_budget_cost_map.get(pc, 0.0) + calc_cost(grade, bd_ym, hrs)
+
+    # Partner (EL/QRP) 실제 시간 제외 — actual_cache에서 조회
+    partner_actual_map: dict[str, float] = {}
+    partner_empnos_by_pc: dict[str, set[str]] = {}
+    for pc, proj in proj_map.items():
+        partners = set()
+        if proj.el_empno:
+            partners.add(proj.el_empno)
+        if proj.qrp_empno:
+            partners.add(proj.qrp_empno)
+        if partners:
+            partner_empnos_by_pc[pc] = partners
+
+    if partner_empnos_by_pc:
+        # 모든 partner empno 한 번에 조회
+        all_partners: set[str] = set()
+        for s in partner_empnos_by_pc.values():
+            all_partners.update(s)
+        partner_actual_rows = db.execute(
+            text(
+                "SELECT project_code, empno, SUM(use_time) "
+                "FROM actual_cache "
+                "WHERE project_code = ANY(:codes) AND empno = ANY(:emps) "
+                "GROUP BY project_code, empno"
+            ),
+            {"codes": filtered_codes, "emps": list(all_partners)},
+        ).fetchall()
+        for par in partner_actual_rows:
+            pc = par[0]
+            emp = par[1]
+            hrs = float(par[2] or 0)
+            if emp in partner_empnos_by_pc.get(pc, set()):
+                partner_actual_map[pc] = partner_actual_map.get(pc, 0.0) + hrs
 
     rows = []
     total_revenue = 0.0
@@ -184,12 +220,30 @@ def get_tracking_projects(
         if tba:
             _, ym, rev, _bh_tba, ah, sc, _em = tba
             rev = float(rev or 0)
-            ah = float(ah or 0)
+            ah_all = float(ah or 0)
             sc = float(sc or 0)
             bh = cum_budget_hours_map.get(pc, float(_bh_tba or 0))
             bc = cum_budget_cost_map.get(pc, 0.0)
         else:
-            ym, rev, bh, ah, sc, bc = "", 0, 0, 0, 0, 0
+            ym, rev, bh, ah_all, sc, bc = "", 0, 0, 0, 0, 0
+
+        # Actual Hour: Partner (EL/QRP) 시간 제외
+        ah = max(0.0, ah_all - partner_actual_map.get(pc, 0.0))
+
+        # Budget Cost에 Fulcrum/RA-Staff/Specialist × Manager rate 추가
+        # 월별 비율로 분배 (Staff 진행률 기준)
+        total_bh = total_budget_hours_map.get(pc, 0.0)
+        progress_ratio = (bh / total_bh) if total_bh > 0 else 0.0
+        target_ym_dashed = project_target_ym.get(pc, "")
+
+        external_hours = (
+            (proj.fulcrum_hours or 0)
+            + (proj.ra_staff_hours or 0)
+            + (proj.specialist_hours or 0)
+        )
+        # Manager rate — 기준 연월의 Busy/NonBusy로 계산
+        external_cost_total = calc_cost_by_code("M", target_ym_dashed, external_hours)
+        bc += external_cost_total * progress_ratio
 
         cost_diff = bc - sc  # Budget Cost - Actual Cost (양수 = 절감)
 
@@ -279,7 +333,6 @@ def get_tracking_project_detail(
         ),
         {"pc": project_code},
     ).fetchall()
-    # 월별 (hours, cost) 집계
     bd_monthly_hours: dict[str, float] = {}
     bd_monthly_cost: dict[str, float] = {}
     for bd in bd_rows:
@@ -290,24 +343,62 @@ def get_tracking_project_detail(
             continue
         bd_monthly_hours[ym] = bd_monthly_hours.get(ym, 0.0) + hrs
         bd_monthly_cost[ym] = bd_monthly_cost.get(ym, 0.0) + calc_cost(grade, ym, hrs)
+    total_staff_hours = sum(bd_monthly_hours.values())
+
+    # Partner (EL/QRP) 실제 시간 제외 — actual_cache에서 조회
+    partner_empnos = []
+    if proj.el_empno:
+        partner_empnos.append(proj.el_empno)
+    if proj.qrp_empno:
+        partner_empnos.append(proj.qrp_empno)
+    partner_actual_total = 0.0
+    if partner_empnos:
+        r_par = db.execute(
+            text(
+                "SELECT COALESCE(SUM(use_time), 0) FROM actual_cache "
+                "WHERE project_code = :pc AND empno = ANY(:emps)"
+            ),
+            {"pc": project_code, "emps": partner_empnos},
+        ).fetchone()
+        partner_actual_total = float(r_par[0] or 0)
+
+    # 외부팀 총 시간 (Manager rate 적용)
+    external_hours = (
+        (proj.fulcrum_hours or 0)
+        + (proj.ra_staff_hours or 0)
+        + (proj.specialist_hours or 0)
+    )
 
     def _to_dashed(ym: str) -> str:
         return f"{ym[:4]}-{ym[4:6]}" if len(ym) == 6 else ym
 
     monthly = []
+    # Actual 월별에서 Partner 시간 제외 — 단순화: 전체 Partner를 최신 월 기준으로만 적용
+    # (월별로 나누려면 추가 쿼리 필요하지만 일단 생략)
     for r in rows:
         ym = r[0]
         target_dashed = _to_dashed(ym)
-        # 해당 월 이하의 누적 합산
         cum_budget_hours = sum(v for k, v in bd_monthly_hours.items() if k and k <= target_dashed)
         cum_budget_cost = sum(v for k, v in bd_monthly_cost.items() if k and k <= target_dashed)
+        # 외부팀 원가: Staff 진행률 기준으로 분배
+        progress_ratio = (cum_budget_hours / total_staff_hours) if total_staff_hours > 0 else 0
+        external_cost_total = calc_cost_by_code("M", ym, external_hours)
+        cum_budget_cost += external_cost_total * progress_ratio
+
+        # Partner 비율 — 단순화: 전체 Partner actual 합을 월별 actual에 비례 분배
+        ah_all = float(r[4] or 0)
+        # 전체 기간 기준 partner 비율
+        latest_ah = float(rows[-1][4] or 0) if rows else 0
+        partner_ratio = (partner_actual_total / latest_ah) if latest_ah > 0 else 0
+        ah_excl_partner = max(0.0, ah_all - ah_all * partner_ratio)
+
         std_cost = float(r[5] or 0)
         monthly.append({
             "year_month": ym,
             "yearly": r[1] or "",
             "revenue": float(r[2] or 0),
             "budget_hours": cum_budget_hours if cum_budget_hours > 0 else float(r[3] or 0),
-            "actual_hours": float(r[4] or 0),
+            "actual_hours": ah_excl_partner,
             "budget_cost": cum_budget_cost,
             "std_cost": std_cost,
             "cost_diff": cum_budget_cost - std_cost,

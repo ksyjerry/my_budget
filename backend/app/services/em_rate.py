@@ -84,3 +84,18 @@ def calc_cost(grade_raw: str | None, year_month: str, hours: float) -> float:
     if not hours:
         return 0.0
     return hours * get_rate(grade_raw, year_month)
+
+
+def get_rate_by_code(code: str, year_month: str) -> float:
+    """정규화된 grade code로 직접 rate 조회 (M, D, SM 등)."""
+    rates = FY26_RATES.get(code)
+    if not rates:
+        return 0.0
+    return rates["busy"] if is_busy_season(year_month) else rates["nonbusy"]
+
+
+def calc_cost_by_code(code: str, year_month: str, hours: float) -> float:
+    """직접 grade code로 원가 계산."""
+    if not hours:
+        return 0.0
+    return hours * get_rate_by_code(code, year_month)
