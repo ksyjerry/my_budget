@@ -12,7 +12,7 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
-from app.api.v1 import auth, budget_upload, budget_input, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist
+from app.api.v1 import auth, budget_upload, budget_input, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist, tracking
 
 app = FastAPI(title=settings.APP_NAME, version="0.1.0")
 
@@ -47,6 +47,7 @@ app.include_router(cache.router, prefix="/api/v1/cache", tags=["cache"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(budget_assist.router, prefix="/api/v1", tags=["budget-assist"])
+app.include_router(tracking.router, prefix="/api/v1", tags=["tracking"])
 
 
 @app.get("/health")

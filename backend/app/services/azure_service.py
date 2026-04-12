@@ -587,6 +587,86 @@ def get_actual_raw_rows(
     return result
 
 
+# ── TBA (Total Budget Amount) 조회 ────────────────
+
+def get_tba_by_projects(project_codes: list[str]) -> list[dict]:
+    """프로젝트별 월별 TBA 데이터 (Revenue/Budget/Actual/Cost/EM).
+
+    배치 단위로 나눠서 Azure 조회 (대량 프로젝트 timeout 방지).
+    """
+    if not project_codes:
+        return []
+
+    cache_key = f"tba:{hash(tuple(sorted(project_codes)))}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    t0 = time.time()
+    BATCH_SIZE = 200  # PRJTCD1 별로 200개씩 배치 조회
+    result: list[dict] = []
+
+    # 프로젝트 코드를 PRJTCD1(앞 5자리)로 그룹핑하여 조회 최적화
+    pc1_map: dict[str, set[str]] = {}
+    for pc in project_codes:
+        segs = pc.split("-")
+        if len(segs) == 3:
+            pc1_map.setdefault(segs[0], set()).add(pc)
+
+    pc1_list = sorted(pc1_map.keys())
+    target_set = set(project_codes)
+
+    try:
+        from app.db.azure_session import get_azure_connection
+        with get_azure_connection() as conn:
+            cursor = conn.cursor()
+            for i in range(0, len(pc1_list), BATCH_SIZE):
+                batch = pc1_list[i:i + BATCH_SIZE]
+                placeholders = ",".join(["%s"] * len(batch))
+                sql = f"""
+                    SELECT
+                        PRJTCD1, PRJTCD2, PRJTCD3, YYMM, YEARLY,
+                        CONTREV, BUDGETTIME, OCCRTIME_TOT,
+                        STD_COST, EM
+                    FROM BI_PARTNERREPORT_TBA_V
+                    WHERE PRJTCD1 IN ({placeholders})
+                      AND YEARLY IN ('2025', '2026')
+                """
+                cursor.execute(sql, batch)
+                for r in cursor.fetchall():
+                    pc = f"{r[0]}-{r[1]}-{r[2]}"
+                    if pc not in target_set:
+                        continue
+                    result.append({
+                        "project_code": pc,
+                        "year_month": r[3],
+                        "yearly": r[4],
+                        "revenue": float(r[5] or 0),
+                        "budget_hours": float(r[6] or 0),
+                        "actual_hours": float(r[7] or 0),
+                        "std_cost": float(r[8] or 0),
+                        "em": float(r[9] or 0),
+                    })
+    except Exception as e:
+        logger.error(f"TBA fetch failed: {e}")
+        return []
+
+    logger.info(f"TBA fetch: {len(result)} rows from {len(pc1_list)} PRJTCD1 groups in {time.time()-t0:.2f}s")
+    _set_cached(cache_key, result)
+    return result
+
+
+def get_tba_latest_by_projects(project_codes: list[str]) -> dict[str, dict]:
+    """프로젝트별 가장 최신 YYMM 레코드 반환."""
+    all_rows = get_tba_by_projects(project_codes)
+    latest: dict[str, dict] = {}
+    for r in all_rows:
+        pc = r["project_code"]
+        if pc not in latest or r["year_month"] > latest[pc]["year_month"]:
+            latest[pc] = r
+    return latest
+
+
 # ── 직원/팀 직접 조회 ─────────────────────────────
 
 def get_employees() -> list[dict]:

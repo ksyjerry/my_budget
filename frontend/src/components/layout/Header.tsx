@@ -27,6 +27,7 @@ const projectDetailsIcon = (
 const projectDetailsSubItems = [
   { name: "Details for EL/PM", href: "/projects" },
   { name: "Details for Staff", href: "/projects-staff" },
+  { name: "Budget Tracking", href: "/projects/tracking", partnerOnly: true },
 ];
 
 const navItems = [
@@ -122,9 +123,15 @@ function OverviewDropdown({ pathname }: { pathname: string }) {
 
 function ProjectDetailsDropdown({ pathname }: { pathname: string }) {
   const [open, setOpen] = useState(false);
+  const [hasPartnerAccess, setHasPartnerAccess] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const isActive = pathname.startsWith("/projects");
-  const currentLabel = pathname.startsWith("/projects-staff") ? "Details for Staff" : "Details for EL/PM";
+  const isTracking = pathname.startsWith("/projects/tracking");
+  const currentLabel = isTracking
+    ? "Budget Tracking"
+    : pathname.startsWith("/projects-staff")
+    ? "Details for Staff"
+    : "Details for EL/PM";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -133,6 +140,31 @@ function ProjectDetailsDropdown({ pathname }: { pathname: string }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const stored = localStorage.getItem("auth_user");
+        const token = stored ? JSON.parse(stored).token : "";
+        if (!token) return;
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const res = await fetch(`${apiBase}/api/v1/tracking/access`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHasPartnerAccess(data.has_access === true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    checkAccess();
+  }, []);
+
+  const visibleSubItems = projectDetailsSubItems.filter(
+    (sub) => !("partnerOnly" in sub && sub.partnerOnly) || hasPartnerAccess
+  );
 
   return (
     <div ref={ref} className="relative">
@@ -151,21 +183,30 @@ function ProjectDetailsDropdown({ pathname }: { pathname: string }) {
       </button>
       {open && (
         <div className="absolute top-full left-0 mt-1 bg-white border border-pwc-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[180px]">
-          {projectDetailsSubItems.map((sub) => (
-            <Link
-              key={sub.href}
-              href={sub.href}
-              onClick={() => setOpen(false)}
-              className={clsx(
-                "block px-4 py-2 text-[13px] hover:bg-orange-50 transition-colors",
-                pathname.startsWith(sub.href) && !(sub.href === "/projects" && pathname.startsWith("/projects-staff"))
-                  ? "text-pwc-orange font-bold"
-                  : "text-pwc-gray-600"
-              )}
-            >
-              {sub.name}
-            </Link>
-          ))}
+          {visibleSubItems.map((sub) => {
+            const isTrackingItem = sub.href === "/projects/tracking";
+            const itemActive = isTrackingItem
+              ? pathname.startsWith("/projects/tracking")
+              : pathname === sub.href ||
+                (sub.href === "/projects-staff" && pathname.startsWith("/projects-staff")) ||
+                (sub.href === "/projects" &&
+                  pathname.startsWith("/projects") &&
+                  !pathname.startsWith("/projects-staff") &&
+                  !pathname.startsWith("/projects/tracking"));
+            return (
+              <Link
+                key={sub.href}
+                href={sub.href}
+                onClick={() => setOpen(false)}
+                className={clsx(
+                  "block px-4 py-2 text-[13px] hover:bg-orange-50 transition-colors",
+                  itemActive ? "text-pwc-orange font-bold" : "text-pwc-gray-600"
+                )}
+              >
+                {sub.name}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
