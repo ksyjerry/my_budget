@@ -99,53 +99,29 @@ def search_clients(q: str = "", db: Session = Depends(get_db)):
 
 @router.get("/employees/search")
 def search_employees(q: str = "", db: Session = Depends(get_db)):
-    """직원 이름/사번으로 검색 (Azure 직원 마스터 + budget_details 병합)."""
+    """직원 이름/사번으로 검색 — Postgres employees 마스터 단일 조회."""
     if not q or len(q) < 2:
         return []
-
-    from app.services import azure_service
-
-    result_map: dict[str, dict] = {}
-
-    # 1) Azure 직원 마스터에서 검색 (전체 LoS)
-    try:
-        for e in azure_service.get_employees():
-            empno = e.get("empno", "")
-            name = e.get("name", "")
-            if not empno or not name:
-                continue
-            if q in name or q in empno:
-                result_map[empno] = {
-                    "empno": empno,
-                    "name": name,
-                    "grade": e.get("grade_name", ""),
-                    "department": e.get("department", ""),
-                }
-    except Exception:
-        pass
-
-    # 2) budget_details에서도 검색 (Azure에 없는 인원 보완)
-    from sqlalchemy import func
-    bd_results = (
-        db.query(BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade)
-        .filter(BudgetDetail.empno != "", BudgetDetail.emp_name != "")
+    from app.models.employee import Employee
+    rows = (
+        db.query(Employee)
         .filter(
-            (BudgetDetail.emp_name.ilike(f"%{q}%")) |
-            (BudgetDetail.empno.ilike(f"%{q}%"))
+            (Employee.name.ilike(f"%{q}%")) |
+            (Employee.empno.ilike(f"%{q}%"))
         )
-        .group_by(BudgetDetail.empno, BudgetDetail.emp_name, BudgetDetail.grade)
-        .limit(30).all()
+        .order_by(Employee.name)
+        .limit(30)
+        .all()
     )
-    for r in bd_results:
-        if r.empno not in result_map:
-            result_map[r.empno] = {
-                "empno": r.empno,
-                "name": r.emp_name,
-                "grade": r.grade or "",
-            }
-
-    results = sorted(result_map.values(), key=lambda x: x["name"])
-    return results[:30]
+    return [
+        {
+            "empno": e.empno,
+            "name": e.name,
+            "grade": e.grade_name or "",
+            "department": e.department or "",
+        }
+        for e in rows
+    ]
 
 
 @router.get("/projects/list")
