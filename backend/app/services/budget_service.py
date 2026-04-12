@@ -31,25 +31,25 @@ def upsert_project_from_client_data(db: Session, data: dict) -> Project:
     """Client/Project 정보를 DB에 저장 또는 업데이트."""
     project_code = data["project_code"]
 
-    # Client upsert
+    # ── Client upsert ─────────────────────────────────────
     client_code = data.get("client_code", project_code.split("-")[0])
     client = db.query(Client).filter(Client.client_code == client_code).first()
     if not client:
-        client = Client(
-            client_code=client_code,
-            client_name=data.get("client_name", ""),
-            industry=data.get("industry"),
-            asset_size=data.get("asset_size"),
-            listing_status=data.get("listing_status"),
-            gaap=data.get("gaap"),
-            consolidated=data.get("consolidated"),
-            subsidiary_count=data.get("subsidiary_count"),
-            internal_control=data.get("internal_control"),
-            initial_audit=data.get("initial_audit"),
-            group_code=data.get("group_code"),
-        )
+        client = Client(client_code=client_code)
         db.add(client)
-        db.flush()
+
+    # 값이 실제로 넘어온 경우에만 UPDATE (None/빈 문자열이 아닌 경우 기존 값 보존)
+    _client_fields = [
+        "client_name", "industry", "asset_size", "listing_status",
+        "gaap", "consolidated", "subsidiary_count", "internal_control",
+        "initial_audit", "group_code", "business_report",
+    ]
+    for f in _client_fields:
+        v = data.get(f)
+        if v is not None and v != "":
+            setattr(client, f, v)
+
+    db.flush()
 
     # Project upsert
     project = db.query(Project).filter(Project.project_code == project_code).first()
