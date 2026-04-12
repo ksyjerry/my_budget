@@ -58,8 +58,13 @@ def sync_clients_endpoint(
 
 
 @router.get("/clients/status")
-def sync_clients_status(db: Session = Depends(get_db)):
-    """마지막 Azure 클라이언트 동기화 상태 조회 (인증 불필요)."""
+def sync_clients_status(
+    db: Session = Depends(get_db),
+    user: dict | None = Depends(get_optional_user),
+):
+    """마지막 Azure 클라이언트 동기화 상태 조회 (인증 필요)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     total = db.query(func.count(Client.id)).scalar() or 0
     azure_synced = (
         db.query(func.count(Client.id))
