@@ -11,3 +11,4 @@ openpyxl==3.1.5
 python-dotenv==1.0.1
 httpx==0.28.1
 PyJWT==2.9.0
+apscheduler==3.10.4

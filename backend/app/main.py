@@ -26,6 +26,46 @@ def startup_cache_warmup():
     )
     thread.start()
 
+from apscheduler.schedulers.background import BackgroundScheduler
+
+_scheduler = BackgroundScheduler(timezone="Asia/Seoul")
+
+
+def _scheduled_client_sync():
+    """매일 06:00 KST 에 Azure → Postgres 클라이언트 동기화."""
+    from app.db.session import SessionLocal
+    from app.services.sync_service import sync_clients
+    logger = logging.getLogger("scheduler")
+    db = SessionLocal()
+    try:
+        n = sync_clients(db)
+        logger.info(f"Scheduled client sync: {n} clients")
+    except Exception as e:
+        logger.error(f"Scheduled client sync failed: {e}")
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+def start_scheduler():
+    if not _scheduler.running:
+        _scheduler.add_job(
+            _scheduled_client_sync,
+            "cron",
+            hour=6,
+            minute=0,
+            id="sync_clients",
+            replace_existing=True,
+        )
+        _scheduler.start()
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    if _scheduler.running:
+        _scheduler.shutdown(wait=False)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL, "http://localhost:8001"],
