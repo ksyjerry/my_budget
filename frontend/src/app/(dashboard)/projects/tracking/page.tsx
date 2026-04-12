@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { getStoredToken } from "@/lib/auth";
 import FilterBar from "@/components/filters/FilterBar";
+import MonthlyTrendChart from "@/components/charts/MonthlyTrendChart";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -240,33 +241,18 @@ export default function BudgetTrackingPage() {
 
   return (
     <div className="p-6 space-y-4">
-      {/* Title */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-pwc-black">Budget Tracking</h2>
-          <p className="text-xs text-pwc-gray-600 mt-0.5">
-            담당 프로젝트의 Revenue vs Cost vs Engagement Margin 추적
-            {kpi?.year_month && (
-              <span className="ml-2 text-pwc-orange font-semibold">
-                기준: {kpi.year_month.slice(0, 4)}-{kpi.year_month.slice(4, 6)}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-[11px] text-pwc-gray-600">
+      {isAdmin && (
+        <div className="flex items-center justify-end gap-3 text-[11px] text-pwc-gray-600">
           <span>Last sync: {fmtSync(lastSync)}</span>
-          {isAdmin && (
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="px-3 py-1 text-[11px] font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors disabled:opacity-50"
-            >
-              {syncing ? "동기화 중..." : "↻ 새로고침"}
-            </button>
-          )}
-          <span>Source: BI_PARTNERREPORT_TBA_V</span>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="px-3 py-1 text-[11px] font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors disabled:opacity-50"
+          >
+            {syncing ? "동기화 중..." : "↻ 새로고침"}
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Filter Bar */}
       <FilterBar
@@ -402,33 +388,19 @@ export default function BudgetTrackingPage() {
               월별 추이 — {projects.find((p) => p.project_code === selectedCode)?.project_name}
             </h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-pwc-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-pwc-gray-600">YYMM</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Revenue</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Std Cost</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">EM</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Budget Hour</th>
-                  <th className="px-3 py-2 text-right font-semibold text-pwc-gray-600">Actual Hour</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthly.map((m) => (
-                  <tr key={m.year_month} className="border-t border-pwc-gray-100">
-                    <td className="px-3 py-2 font-mono">{m.year_month}</td>
-                    <td className="px-3 py-2 text-right">{fmtKRW(m.revenue)}</td>
-                    <td className="px-3 py-2 text-right">{fmtKRW(m.std_cost)}</td>
-                    <td className="px-3 py-2 text-right">
-                      <EmCell value={m.em} />
-                    </td>
-                    <td className="px-3 py-2 text-right">{fmtHours(m.budget_hours)}</td>
-                    <td className="px-3 py-2 text-right">{fmtHours(m.actual_hours)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4">
+            <MonthlyTrendChart
+              data={monthly.map((m) => ({
+                month: `${m.year_month.slice(0, 4)}년 ${parseInt(m.year_month.slice(4, 6), 10)}월`,
+                Revenue: m.revenue,
+                "Std Cost": m.std_cost,
+              }))}
+              series={[
+                { key: "Revenue", label: "Revenue", color: "#D04A02" },
+                { key: "Std Cost", label: "Std Cost", color: "#6D6D6D" },
+              ]}
+              height={320}
+            />
           </div>
         </div>
       )}
