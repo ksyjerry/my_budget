@@ -62,17 +62,26 @@ def get_service_tasks(service_type: str = "AUDIT", db: Session = Depends(get_db)
 
 # ── Client Search ────────────────────────────────────
 
+def _client_needs_detail(c) -> bool:
+    """주요 상세필드가 모두 비어있으면 True — Azure sync 이후 사용자 입력 전 상태."""
+    key_fields = [c.industry, c.asset_size, c.listing_status, c.gaap]
+    return not any(f for f in key_fields)
+
+
 @router.get("/clients/search")
 def search_clients(q: str = "", db: Session = Depends(get_db)):
-    """클라이언트 이름으로 검색."""
+    """클라이언트 이름/코드로 검색."""
     query = db.query(Client)
     if q:
-        query = query.filter(Client.client_name.ilike(f"%{q}%"))
+        query = query.filter(
+            (Client.client_name.ilike(f"%{q}%")) |
+            (Client.client_code.ilike(f"%{q}%"))
+        )
     results = query.order_by(Client.client_name).limit(50).all()
     return [
         {
             "client_code": c.client_code,
-            "client_name": c.client_name,
+            "client_name": c.client_name or "",
             "industry": c.industry or "",
             "asset_size": c.asset_size or "",
             "listing_status": c.listing_status or "",
@@ -82,6 +91,7 @@ def search_clients(q: str = "", db: Session = Depends(get_db)):
             "internal_control": c.internal_control or "",
             "business_report": c.business_report or "",
             "initial_audit": c.initial_audit or "",
+            "needs_detail": _client_needs_detail(c),
         }
         for c in results
     ]
