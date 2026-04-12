@@ -16,10 +16,13 @@ def sync_employees(db: Session) -> int:
     """직원 마스터 동기화."""
     with _get_azure() as conn:
         cursor = conn.cursor(as_dict=True)
+        # 재직자 + Tax LoS 제외 (Budget+ 는 Assurance 용)
         cursor.execute("""
             SELECT EMPNO, EMPNM, CM_NM, GRADCD, GRADNM,
                    TL_EMPNO, LOS, ORG_CD, ORG_NM, PWC_ID, EMP_STAT
             FROM BI_STAFFREPORT_EMP_V
+            WHERE EMP_STAT = N'재직'
+              AND (LOS IS NULL OR LOS != N'Tax')
         """)
         rows = cursor.fetchall()
 
