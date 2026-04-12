@@ -542,10 +542,10 @@ export default function BudgetWizardPage() {
     );
   };
 
-  const updateRowAssignee = (idx: number, empno: string, name: string) => {
+  const updateRowAssignee = (idx: number, empno: string, name: string, grade: string) => {
     setTemplateRows((prev) =>
       prev.map((r, i) =>
-        i === idx ? { ...r, empno, emp_name: name } : r
+        i === idx ? { ...r, empno, emp_name: name, grade } : r
       )
     );
   };
@@ -1774,7 +1774,7 @@ function Step3Template({
   setRows: (rows: TemplateRow[]) => void;
   toggleRow: (idx: number) => void;
   updateRowMonth: (idx: number, month: string, value: number) => void;
-  updateRowAssignee: (idx: number, empno: string, name: string) => void;
+  updateRowAssignee: (idx: number, empno: string, name: string, grade: string) => void;
   duplicateRow: (idx: number) => void;
   rowTotal: (row: TemplateRow) => number;
   templateTotal: { total: number; monthTotals: Record<string, number> };
@@ -1796,10 +1796,10 @@ function Step3Template({
   const [newRowUnit, setNewRowUnit] = useState("");
 
   // Column definitions for grid navigation
-  // col 0=checkbox, 1=대분류(readonly), 2=관리단위(readonly), 3=담당자, 4=합계(readonly), 5~16=months, 17=actions
+  // col 0=checkbox, 1=대분류(readonly), 2=관리단위(readonly), 3=담당자, 4=직급(readonly), 5=합계(readonly), 6~17=months, 18=actions
   const FIRST_EDITABLE_COL = 3;
-  const MONTH_COL_START = 5;
-  const MONTH_COL_END = 5 + MONTHS.length - 1;
+  const MONTH_COL_START = 6;
+  const MONTH_COL_END = 6 + MONTHS.length - 1;
   const TOTAL_COLS = MONTH_COL_END + 1;
 
   const handleAiSuggest = async () => {
@@ -2210,7 +2210,7 @@ function Step3Template({
       {/* Excel-like Spreadsheet Grid */}
       <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm">
         <table ref={gridRef} className="w-full text-xs whitespace-nowrap border-collapse select-none" style={{ tableLayout: "fixed" }}>
-          <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 56 }} />{MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}<col style={{ width: 56 }} /></colgroup>
+          <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 68 }} /><col style={{ width: 56 }} />{MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}<col style={{ width: 56 }} /></colgroup>
           <thead className="bg-pwc-gray-50 sticky top-0 z-10">
             <tr className="border-b border-pwc-gray-200">
               <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">
@@ -2219,6 +2219,7 @@ function Step3Template({
               <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">대분류</th>
               <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">Budget 관리단위</th>
               <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">담당자</th>
+              <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">직급</th>
               <th className="px-2 py-2 text-right font-semibold text-pwc-gray-600">합계</th>
               {MONTH_LABELS.map((label, i) => (
                 <th key={MONTHS[i]} className="px-1 py-2 text-right font-semibold text-pwc-gray-600">{label}</th>
@@ -2308,7 +2309,7 @@ function Step3Template({
                           return;
                         }
                         const m = members.find((m) => m.empno === newEmpno);
-                        updateRowAssignee(idx, newEmpno, m?.name || newEmpno);
+                        updateRowAssignee(idx, newEmpno, m?.name || newEmpno, m?.grade || "");
                       }}
                       disabled={!row.enabled}
                       className="w-full px-1 py-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer"
@@ -2320,6 +2321,10 @@ function Step3Template({
                         </option>
                       ))}
                     </select>
+                  </td>
+                  {/* 직급 */}
+                  <td className="px-2 py-0.5 text-pwc-gray-700 border-r border-pwc-gray-100 truncate" title={row.grade || (members.find((m) => m.empno === row.empno)?.grade ?? "")}>
+                    {row.grade || members.find((m) => m.empno === row.empno)?.grade || ""}
                   </td>
                   {/* 합계 */}
                   <td className="px-2 py-0.5 text-right font-bold border-r border-pwc-gray-200 bg-pwc-gray-50/50">
