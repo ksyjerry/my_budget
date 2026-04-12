@@ -169,12 +169,17 @@ export function applyFilters<T>(
   filters: CrossFilterSelection[],
   getDimensionValue: (item: T, dimension: string) => string | undefined
 ): T[] {
-  if (filters.length === 0) return data;
+  if (filters.length === 0 || data.length === 0) return data;
+
+  // 실제로 이 데이터에 적용 가능한 필터만 골라냄 (차원이 매칭되는 경우)
+  const applicable = filters.filter(
+    (f) => getDimensionValue(data[0], f.dimension) !== undefined
+  );
+  if (applicable.length === 0) return data; // 원본 ref 그대로 — 무의미한 리렌더 방지
 
   return data.filter((item) =>
-    filters.every((f) => {
+    applicable.every((f) => {
       const val = getDimensionValue(item, f.dimension);
-      // dimension이 해당 데이터에 없으면 필터 무시 (다른 차원의 필터)
       if (val === undefined) return true;
       return val === f.value;
     })

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import FilterBar from "@/components/filters/FilterBar";
 import { useApi, buildQuery, useFilterOptions, SummaryData } from "@/hooks/useApi";
 import { CrossFilterProvider, useCrossFilter, applyFilters } from "@/lib/cross-filter";
@@ -28,6 +28,11 @@ function SummaryContent() {
   });
 
   const { toggleFilter, clearAll, isSelected, hasActiveFilter, getActiveFilters } = useCrossFilter();
+
+  const handleGroupBarClick = useCallback(
+    (group: string) => toggleFilter("groupBar", "group", group),
+    [toggleFilter]
+  );
 
   const query = buildQuery(filters);
   const { data: apiData, loading, error } = useApi<SummaryData>(`/api/v1/summary${query}`);
@@ -134,7 +139,7 @@ function SummaryContent() {
                 data={chartData}
                 series={chartSeries}
                 height={320}
-                onBarClick={(group) => toggleFilter("groupBar", "group", group)}
+                onBarClick={handleGroupBarClick}
                 activeBar={activeGroupFilter}
               />
             )}

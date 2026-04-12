@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import FilterBar from "@/components/filters/FilterBar";
 import DonutChart from "@/components/charts/DonutChart";
 import HorizontalBarChart from "@/components/charts/HorizontalBarChart";
@@ -67,6 +67,15 @@ function AssignmentsContent() {
   // Cross-filter hook
   const { state: cfState, toggleFilter, isSelected, hasActiveFilter, clearAll, getActiveFilters } =
     useCrossFilter();
+
+  const handleProjectDonutClick = useCallback(
+    (name: string) => toggleFilter("projectDonut", "project_name", name),
+    [toggleFilter]
+  );
+  const handleActivityBarClick = useCallback(
+    (name: string) => toggleFilter("activityBar", "budget_category", name),
+    [toggleFilter]
+  );
 
   // API filter state
   const [filters, setFilters] = useState({
@@ -267,9 +276,7 @@ function AssignmentsContent() {
                 <DonutChart
                   data={donutData}
                   height={220}
-                  onSegmentClick={(name) =>
-                    toggleFilter("projectDonut", "project_name", name)
-                  }
+                  onSegmentClick={handleProjectDonutClick}
                   activeSegment={donutActiveSegment}
                 />
               )}
@@ -288,9 +295,7 @@ function AssignmentsContent() {
                 <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
                   <HorizontalBarChart
                     data={barChartData}
-                    onBarClick={(name) =>
-                      toggleFilter("activityBar", "budget_category", name)
-                    }
+                    onBarClick={handleActivityBarClick}
                     activeBar={barActiveBar}
                   />
                 </div>

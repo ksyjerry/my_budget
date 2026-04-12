@@ -66,6 +66,22 @@ export default function DonutChart({
     return Math.max(180, Math.min(height, available));
   }, [height, containerWidth]);
 
+  // Stable refs for handlers/state used inside the draw effect — so the draw
+  // effect doesn't re-run and re-animate when only callbacks or hover state change.
+  const onSegmentClickRef = useRef(onSegmentClick);
+  const showTooltipRef = useRef(showTooltip);
+  const hideTooltipRef = useRef(hideTooltip);
+  const hasActiveRef = useRef(hasActive);
+  const activeSegmentRef = useRef(activeSegment);
+  useEffect(() => {
+    onSegmentClickRef.current = onSegmentClick;
+    showTooltipRef.current = showTooltip;
+    hideTooltipRef.current = hideTooltip;
+    hasActiveRef.current = hasActive;
+    activeSegmentRef.current = activeSegment;
+  });
+
+  // Effect A — initial / data change: full clear + draw + entry animation.
   useEffect(() => {
     if (!svgRef.current || sortedData.length === 0 || donutSize === 0) return;
 
@@ -100,34 +116,40 @@ export default function DonutChart({
 
     const arcs = pie(sortedData);
 
-    // Paths
+    // Paths — use refs for handlers to keep effect stable
     g.selectAll("path")
       .data(arcs)
       .join("path")
+      .attr("class", "donut-arc")
       .attr("d", arc)
       .attr("fill", (_, i) => COLORS[i % COLORS.length])
-      .attr("opacity", (d) => (hasActive && d.data.name !== activeSegment ? 0.2 : 1))
-      .attr("cursor", onSegmentClick ? "pointer" : "default")
+      .attr("opacity", (d) =>
+        hasActiveRef.current && d.data.name !== activeSegmentRef.current ? 0.2 : 1
+      )
+      .attr("cursor", onSegmentClickRef.current ? "pointer" : "default")
       .on("mouseenter", function (event, d) {
         const i = arcs.indexOf(d);
         setHoveredIndex(i);
         d3.select(this).transition().duration(200)
           .attr("d", arcHover(d) as string).attr("opacity", 1);
         const pct = Math.round((d.data.value / total) * 100);
-        showTooltip(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
+        showTooltipRef.current(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
       })
       .on("mousemove", function (event, d) {
         const pct = Math.round((d.data.value / total) * 100);
-        showTooltip(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
+        showTooltipRef.current(event, `<strong>${d.data.name}</strong><br/>${Math.round(d.data.value).toLocaleString()} (${pct}%)`);
       })
       .on("mouseleave", function (_, d) {
         setHoveredIndex(null);
         d3.select(this).transition().duration(200)
           .attr("d", arc(d) as string)
-          .attr("opacity", hasActive && d.data.name !== activeSegment ? 0.2 : 1);
-        hideTooltip();
+          .attr(
+            "opacity",
+            hasActiveRef.current && d.data.name !== activeSegmentRef.current ? 0.2 : 1
+          );
+        hideTooltipRef.current();
       })
-      .on("click", (_, d) => onSegmentClick?.(d.data.name));
+      .on("click", (_, d) => onSegmentClickRef.current?.(d.data.name));
 
     // Center total label
     g.append("text")
@@ -152,9 +174,21 @@ export default function DonutChart({
       .delay((_, i) => i * 50)
       .attr("opacity", (d) => {
         const datum = d as unknown as d3.PieArcDatum<{ name: string; value: number }>;
-        return hasActive && datum.data.name !== activeSegment ? 0.2 : 1;
+        return hasActiveRef.current && datum.data.name !== activeSegmentRef.current ? 0.2 : 1;
       });
-  }, [sortedData, donutSize, total, hasActive, activeSegment, onSegmentClick, showTooltip, hideTooltip]);
+  }, [sortedData, donutSize, total]);
+
+  // Effect B — highlight/filter change: only transition opacity, no redraw.
+  useEffect(() => {
+    if (!svgRef.current) return;
+    d3.select(svgRef.current)
+      .selectAll<SVGPathElement, d3.PieArcDatum<{ name: string; value: number }>>("path.donut-arc")
+      .transition()
+      .duration(150)
+      .attr("opacity", (d) =>
+        hasActive && d.data.name !== activeSegment ? 0.2 : 1
+      );
+  }, [hasActive, activeSegment]);
 
   return (
     <div ref={containerRef} className="relative w-full flex items-center gap-4">

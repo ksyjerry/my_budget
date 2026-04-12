@@ -59,6 +59,21 @@ export default function HorizontalBarChart({
     if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
   }, []);
 
+  // Stable refs for handlers — avoid re-running draw effect when only callbacks change
+  const onBarClickRef = useRef(onBarClick);
+  const showTooltipRef = useRef(showTooltip);
+  const hideTooltipRef = useRef(hideTooltip);
+  const hasActiveRef = useRef(hasActive);
+  const activeBarRef = useRef(activeBar);
+  useEffect(() => {
+    onBarClickRef.current = onBarClick;
+    showTooltipRef.current = showTooltip;
+    hideTooltipRef.current = hideTooltip;
+    hasActiveRef.current = hasActive;
+    activeBarRef.current = activeBar;
+  });
+
+  // Effect A — data / layout change: full clear + draw + entry animation.
   useEffect(() => {
     if (!svgRef.current || !data.length || containerWidth === 0) return;
 
@@ -113,28 +128,31 @@ export default function HorizontalBarChart({
       .attr("text-anchor", "end")
       .style("font-size", "11px")
       .style("fill", "#2D2D2D")
-      .style("cursor", onBarClick ? "pointer" : "default")
+      .style("cursor", onBarClickRef.current ? "pointer" : "default")
       .text((d) => (d.name.length > 28 ? d.name.slice(0, 28) + "..." : d.name))
-      .on("click", (_, d) => onBarClick?.(d.name))
+      .on("click", (_, d) => onBarClickRef.current?.(d.name))
       .append("title").text((d) => d.name);
 
     // Bar groups
     const groups = g.append("g")
+      .attr("class", "bar-groups")
       .selectAll<SVGGElement, BarDatum>("g")
       .data(data)
       .join("g")
+      .attr("class", "bar-row")
       .attr("transform", (d) => `translate(0,${y(d.name) || 0})`)
-      .style("cursor", onBarClick ? "pointer" : "default")
-      .on("click", (_, d) => onBarClick?.(d.name));
+      .style("cursor", onBarClickRef.current ? "pointer" : "default")
+      .on("click", (_, d) => onBarClickRef.current?.(d.name));
 
     const halfBand = y.bandwidth() / 2;
     const budgetY = halfBand - BAR_HEIGHT - BAR_GAP / 2;
     const actualY = halfBand + BAR_GAP / 2;
 
-    // Active highlight bg
-    if (hasActive) {
-      groups.filter((d) => d.name === activeBar)
+    // Active highlight bg — drawn from initial state via refs
+    if (hasActiveRef.current) {
+      groups.filter((d) => d.name === activeBarRef.current)
         .insert("rect", ":first-child")
+        .attr("class", "bar-highlight-bg")
         .attr("x", -4).attr("y", -2)
         .attr("width", chartW + 8).attr("height", y.bandwidth() + 4)
         .attr("rx", 4).attr("fill", "#FFF3ED")
@@ -143,55 +161,59 @@ export default function HorizontalBarChart({
 
     // Budget bars
     groups.append("rect")
+      .attr("class", "bar-budget")
       .attr("y", budgetY).attr("height", BAR_HEIGHT).attr("rx", 2)
       .attr("fill", BUDGET_COLOR)
-      .attr("opacity", (d) => (hasActive && d.name !== activeBar ? 0.2 : 1))
+      .attr("opacity", (d) => (hasActiveRef.current && d.name !== activeBarRef.current ? 0.2 : 1))
       .attr("width", 0)
       .on("mouseenter", function (event, d) {
-        if (!hasActive || d.name === activeBar) d3.select(this).transition().duration(150).attr("fill", "#ABABAB");
-        showTooltip(event,
+        if (!hasActiveRef.current || d.name === activeBarRef.current)
+          d3.select(this).transition().duration(150).attr("fill", "#ABABAB");
+        showTooltipRef.current(event,
           `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${Math.round(d.budget).toLocaleString()}</strong>`);
       })
       .on("mousemove", function (event, d) {
-        showTooltip(event,
+        showTooltipRef.current(event,
           `<strong>${d.name}</strong><br/><span style="color:${BUDGET_COLOR}">&#9679;</span> Budget: <strong>${Math.round(d.budget).toLocaleString()}</strong>`);
       })
       .on("mouseleave", function () {
         d3.select(this).transition().duration(150).attr("fill", BUDGET_COLOR);
-        hideTooltip();
+        hideTooltipRef.current();
       })
       .transition().duration(600).delay((_, i) => i * 80)
       .attr("width", (d) => x(d.budget));
 
     // Actual bars
     groups.append("rect")
+      .attr("class", "bar-actual")
       .attr("y", actualY).attr("height", BAR_HEIGHT).attr("rx", 2)
       .attr("fill", (d) => (d.actual > d.budget && d.budget > 0 ? ACTUAL_OVER_COLOR : ACTUAL_COLOR))
-      .attr("opacity", (d) => (hasActive && d.name !== activeBar ? 0.2 : 1))
+      .attr("opacity", (d) => (hasActiveRef.current && d.name !== activeBarRef.current ? 0.2 : 1))
       .attr("width", 0)
       .on("mouseenter", function (event, d) {
         const base = d.actual > d.budget && d.budget > 0 ? ACTUAL_OVER_COLOR : ACTUAL_COLOR;
-        if (!hasActive || d.name === activeBar)
+        if (!hasActiveRef.current || d.name === activeBarRef.current)
           d3.select(this).transition().duration(150).attr("fill", d3.color(base)!.darker(0.3).formatHex());
         const pct = d.budget > 0 ? Math.round((d.actual / d.budget) * 100) : "-";
-        showTooltip(event,
+        showTooltipRef.current(event,
           `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${Math.round(d.actual).toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
       })
       .on("mousemove", function (event, d) {
         const pct = d.budget > 0 ? Math.round((d.actual / d.budget) * 100) : "-";
-        showTooltip(event,
+        showTooltipRef.current(event,
           `<strong>${d.name}</strong><br/><span style="color:${ACTUAL_COLOR}">&#9679;</span> Actual: <strong>${Math.round(d.actual).toLocaleString()}</strong><br/>Progress: <strong>${pct}%</strong>`);
       })
       .on("mouseleave", function (_, d) {
         d3.select(this).transition().duration(150)
           .attr("fill", d.actual > d.budget && d.budget > 0 ? ACTUAL_OVER_COLOR : ACTUAL_COLOR);
-        hideTooltip();
+        hideTooltipRef.current();
       })
       .transition().duration(600).delay((_, i) => i * 80 + 100)
       .attr("width", (d) => x(d.actual));
 
     // Progress % labels
     groups.append("text")
+      .attr("class", "bar-pct")
       .attr("x", (d) => x(Math.max(d.budget, d.actual)) + 6)
       .attr("y", halfBand).attr("dy", "0.35em")
       .style("font-size", "10px").style("fill", "#6D6D6D").style("opacity", 0)
@@ -200,7 +222,7 @@ export default function HorizontalBarChart({
         return `${pct}%`;
       })
       .transition().duration(400).delay((_, i) => i * 80 + 500)
-      .style("opacity", (d) => (hasActive && d.name !== activeBar ? "0.2" : "1"));
+      .style("opacity", (d) => (hasActiveRef.current && d.name !== activeBarRef.current ? "0.2" : "1"));
 
     // Legend
     const legend = svg.append("g").attr("transform", `translate(${margin.left},${height - 12})`);
@@ -212,7 +234,46 @@ export default function HorizontalBarChart({
       lg.append("rect").attr("width", 12).attr("height", 10).attr("rx", 2).attr("fill", item.color);
       lg.append("text").attr("x", 16).attr("y", 9).style("font-size", "11px").style("fill", "#6D6D6D").text(item.label);
     });
-  }, [data, containerWidth, propHeight, hasActive, activeBar, onBarClick, showTooltip, hideTooltip]);
+  }, [data, containerWidth, propHeight]);
+
+  // Effect B — highlight only: transition opacity without full redraw.
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+
+    // Update bar/label opacity
+    svg.selectAll<SVGRectElement, BarDatum>("rect.bar-budget, rect.bar-actual")
+      .transition().duration(150)
+      .attr("opacity", (d) => (hasActive && d.name !== activeBar ? 0.2 : 1));
+    svg.selectAll<SVGTextElement, BarDatum>("text.bar-pct")
+      .transition().duration(150)
+      .style("opacity", (d) => (hasActive && d.name !== activeBar ? "0.2" : "1"));
+
+    // Manage active highlight background: remove existing, add if needed
+    svg.selectAll("rect.bar-highlight-bg").remove();
+    if (hasActive && activeBar) {
+      svg.selectAll<SVGGElement, BarDatum>("g.bar-row")
+        .filter((d) => d.name === activeBar)
+        .each(function () {
+          const row = d3.select(this);
+          const datum = row.datum() as BarDatum;
+          if (!datum) return;
+          // Approximate bandwidth from existing rect heights
+          const firstRect = row.select<SVGRectElement>("rect.bar-budget").node();
+          if (!firstRect) return;
+          const parent = svgRef.current!;
+          const chartWNow = parent.clientWidth - 180 - 56;
+          // Re-insert highlight rect at the front of the row
+          row.insert("rect", ":first-child")
+            .attr("class", "bar-highlight-bg")
+            .attr("x", -4).attr("y", -2)
+            .attr("width", chartWNow + 8)
+            .attr("height", BAR_HEIGHT * 2 + BAR_GAP + 4)
+            .attr("rx", 4).attr("fill", "#FFF3ED")
+            .attr("stroke", "#D04A02").attr("stroke-width", 1).attr("stroke-opacity", 0.3);
+        });
+    }
+  }, [hasActive, activeBar]);
 
   return (
     <div ref={containerRef} className="relative w-full">

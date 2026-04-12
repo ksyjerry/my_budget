@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import FilterBar from "@/components/filters/FilterBar";
 import KPICard from "@/components/ui/KPICard";
 import DonutChart from "@/components/charts/DonutChart";
@@ -108,6 +108,16 @@ function ProjectDetailPanel({
     getActiveFilters,
   } = useCrossFilter();
 
+  // Stable callbacks — prevent chart useEffect from re-running on every parent render
+  const handleDonutClick = useCallback(
+    (name: string) => toggleFilter("fldtDonut", "fldt_type", name),
+    [toggleFilter]
+  );
+  const handleBarClick = useCallback(
+    (name: string) => toggleFilter("activityBar", "budget_category", name),
+    [toggleFilter]
+  );
+
   // Active segment/bar derived from cross-filter state
   const donutActive = useMemo(() => {
     const sel = getActiveFilters("__none__").find((s) => s.sourceId === "fldtDonut");
@@ -211,7 +221,7 @@ function ProjectDetailPanel({
           <DonutChart
             data={filteredDonutData}
             height={200}
-            onSegmentClick={(name) => toggleFilter("fldtDonut", "fldt_type", name)}
+            onSegmentClick={handleDonutClick}
             activeSegment={donutActive}
           />
         </div>
@@ -222,7 +232,7 @@ function ProjectDetailPanel({
           <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
             <HorizontalBarChart
               data={filteredBarData}
-              onBarClick={(name) => toggleFilter("activityBar", "budget_category", name)}
+              onBarClick={handleBarClick}
               activeBar={barActive}
             />
           </div>
