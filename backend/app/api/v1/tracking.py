@@ -1,5 +1,12 @@
-"""Budget Tracking API — Partner view for cost/revenue tracking."""
+"""Budget Tracking API — Partner view for cost/revenue tracking.
+
+Data source: PostgreSQL tba_cache (synced from Azure BI_PARTNERREPORT_TBA_V).
+Call POST /tracking/sync to refresh cache.
+"""
+import logging
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -9,6 +16,7 @@ from app.models.budget_master import PartnerAccessConfig
 from app.services import azure_service
 from app.api.deps import get_optional_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -50,7 +58,8 @@ def get_tracking_projects(
 ):
     """Partner의 프로젝트별 Budget Amount vs Actual Amount 추적.
 
-    - year_month: 특정 월 (YYYYMM) 기준. 미지정 시 최신 월.
+    데이터 소스: PostgreSQL tba_cache (고속 조회).
+    - year_month: 특정 월 (YYYYMM). 미지정 시 프로젝트별 최신 월.
     - project_code / el_empno / pm_empno / department: 추가 필터
     """
     if not user:
@@ -64,7 +73,7 @@ def get_tracking_projects(
     if not allowed_codes:
         return {"kpi": {}, "projects": [], "year_months": []}
 
-    # 프로젝트 사전 필터 (DB 레벨)
+    # 프로젝트 사전 필터
     proj_query = db.query(Project).filter(Project.project_code.in_(allowed_codes))
     if project_code:
         proj_query = proj_query.filter(Project.project_code == project_code)
@@ -82,25 +91,42 @@ def get_tracking_projects(
     if not filtered_codes:
         return {"kpi": {}, "projects": [], "year_months": []}
 
-    # Azure TBA 조회 — 전체 월별 데이터
-    all_tba = azure_service.get_tba_by_projects(filtered_codes)
+    # 사용 가능한 year_months (캐시 전체 기준)
+    ym_result = db.execute(
+        text(
+            "SELECT DISTINCT year_month FROM tba_cache "
+            "WHERE project_code = ANY(:codes) ORDER BY year_month DESC"
+        ),
+        {"codes": filtered_codes},
+    )
+    available_yms = [r[0] for r in ym_result]
 
-    # 사용 가능한 year_month 목록 (최신순)
-    available_yms = sorted({r["year_month"] for r in all_tba}, reverse=True)
-
-    # year_month 필터 적용
+    # 대상 TBA 조회 — 특정 월 또는 프로젝트별 최신월
     if year_month:
-        selected_tba = [r for r in all_tba if r["year_month"] == year_month]
+        tba_rows = db.execute(
+            text(
+                "SELECT project_code, year_month, revenue, budget_hours, "
+                "       actual_hours, std_cost, em "
+                "FROM tba_cache "
+                "WHERE project_code = ANY(:codes) AND year_month = :ym"
+            ),
+            {"codes": filtered_codes, "ym": year_month},
+        ).fetchall()
     else:
-        # 미지정 시 프로젝트별 최신월
-        latest: dict[str, dict] = {}
-        for r in all_tba:
-            pc = r["project_code"]
-            if pc not in latest or r["year_month"] > latest[pc]["year_month"]:
-                latest[pc] = r
-        selected_tba = list(latest.values())
+        # DISTINCT ON으로 프로젝트별 최신 월 한 건씩
+        tba_rows = db.execute(
+            text(
+                "SELECT DISTINCT ON (project_code) "
+                "       project_code, year_month, revenue, budget_hours, "
+                "       actual_hours, std_cost, em "
+                "FROM tba_cache "
+                "WHERE project_code = ANY(:codes) "
+                "ORDER BY project_code, year_month DESC"
+            ),
+            {"codes": filtered_codes},
+        ).fetchall()
 
-    tba_map = {r["project_code"]: r for r in selected_tba}
+    tba_map = {r[0]: r for r in tba_rows}
 
     rows = []
     total_revenue = 0.0
@@ -115,18 +141,22 @@ def get_tracking_projects(
         if not proj:
             continue
 
-        rev = tba["revenue"] if tba else 0
-        bh = tba["budget_hours"] if tba else 0
-        ah = tba["actual_hours"] if tba else 0
-        sc = tba["std_cost"] if tba else 0
-        em = tba["em"] if tba else 0
+        if tba:
+            _, ym, rev, bh, ah, sc, em = tba
+            rev = float(rev or 0)
+            bh = float(bh or 0)
+            ah = float(ah or 0)
+            sc = float(sc or 0)
+            em = float(em or 0)
+        else:
+            ym, rev, bh, ah, sc, em = "", 0, 0, 0, 0, 0
 
         rows.append({
             "project_code": pc,
             "project_name": proj.project_name or "",
             "el_name": proj.el_name or "",
             "pm_name": proj.pm_name or "",
-            "year_month": tba["year_month"] if tba else "",
+            "year_month": ym,
             "revenue": rev,
             "budget_hours": bh,
             "actual_hours": ah,
@@ -142,8 +172,13 @@ def get_tracking_projects(
         total_std_cost += sc
         total_em += em
 
-    # Revenue 기준 내림차순 (동일 시 EM 내림차순)
     rows.sort(key=lambda x: (-x["revenue"], -x["em"]))
+
+    # 마지막 동기화 시각
+    last_sync_row = db.execute(
+        text("SELECT MAX(synced_at) FROM tba_cache")
+    ).fetchone()
+    last_sync = last_sync_row[0].isoformat() if last_sync_row and last_sync_row[0] else None
 
     return {
         "kpi": {
@@ -158,6 +193,7 @@ def get_tracking_projects(
         },
         "projects": rows,
         "year_months": available_yms,
+        "last_sync": last_sync,
     }
 
 
@@ -183,9 +219,27 @@ def get_tracking_project_detail(
     if not proj:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
 
-    # Azure TBA 월별 데이터
-    monthly = azure_service.get_tba_by_projects([project_code])
-    monthly.sort(key=lambda r: r["year_month"])
+    # 로컬 캐시에서 월별 TBA 조회
+    rows = db.execute(
+        text(
+            "SELECT year_month, yearly, revenue, budget_hours, actual_hours, std_cost, em "
+            "FROM tba_cache WHERE project_code = :pc ORDER BY year_month"
+        ),
+        {"pc": project_code},
+    ).fetchall()
+    monthly = [
+        {
+            "year_month": r[0],
+            "yearly": r[1] or "",
+            "revenue": float(r[2] or 0),
+            "budget_hours": float(r[3] or 0),
+            "actual_hours": float(r[4] or 0),
+            "std_cost": float(r[5] or 0),
+            "em": float(r[6] or 0),
+            "project_code": project_code,
+        }
+        for r in rows
+    ]
 
     return {
         "project": {
@@ -198,6 +252,75 @@ def get_tracking_project_detail(
         "monthly": monthly,
         "latest": monthly[-1] if monthly else None,
     }
+
+
+def _sync_tba_cache(db: Session) -> dict:
+    """Azure BI_PARTNERREPORT_TBA_V에서 전체 프로젝트 TBA 데이터를 로컬 캐시로 동기화."""
+    t0 = datetime.now()
+
+    # 전체 프로젝트 코드
+    all_codes = [c[0] for c in db.query(Project.project_code).all()]
+    if not all_codes:
+        return {"synced": 0, "elapsed_sec": 0, "message": "no projects"}
+
+    # Azure 메모리 캐시 초기화 후 전체 조회 (fresh data 보장)
+    azure_service._cache.clear()
+    tba_rows = azure_service.get_tba_by_projects(all_codes)
+
+    if not tba_rows:
+        return {"synced": 0, "elapsed_sec": (datetime.now() - t0).total_seconds(), "message": "empty from azure"}
+
+    # UPSERT — ON CONFLICT로 프로젝트+월 기준 갱신
+    db.execute(text("DELETE FROM tba_cache"))
+    synced = 0
+    for r in tba_rows:
+        db.execute(
+            text(
+                "INSERT INTO tba_cache "
+                "  (project_code, year_month, yearly, revenue, budget_hours, actual_hours, std_cost, em, synced_at) "
+                "VALUES (:pc, :ym, :yr, :rev, :bh, :ah, :sc, :em, NOW()) "
+                "ON CONFLICT (project_code, year_month) DO UPDATE SET "
+                "  yearly = EXCLUDED.yearly, "
+                "  revenue = EXCLUDED.revenue, "
+                "  budget_hours = EXCLUDED.budget_hours, "
+                "  actual_hours = EXCLUDED.actual_hours, "
+                "  std_cost = EXCLUDED.std_cost, "
+                "  em = EXCLUDED.em, "
+                "  synced_at = NOW()"
+            ),
+            {
+                "pc": r["project_code"],
+                "ym": r["year_month"],
+                "yr": r.get("yearly", ""),
+                "rev": r["revenue"],
+                "bh": r["budget_hours"],
+                "ah": r["actual_hours"],
+                "sc": r["std_cost"],
+                "em": r["em"],
+            },
+        )
+        synced += 1
+
+    db.commit()
+    elapsed = (datetime.now() - t0).total_seconds()
+    logger.info(f"TBA cache synced: {synced} rows in {elapsed:.1f}s")
+    return {"synced": synced, "elapsed_sec": round(elapsed, 1), "message": "ok"}
+
+
+@router.post("/tracking/sync")
+def sync_tba_cache(
+    db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """TBA 캐시 동기화 (Admin 전용)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    cfg = _get_partner_access(db, user["empno"])
+    if not cfg or cfg.scope != "all":
+        raise HTTPException(status_code=403, detail="관리자(scope=all)만 동기화할 수 있습니다.")
+
+    result = _sync_tba_cache(db)
+    return result
 
 
 @router.get("/tracking/filter-options")

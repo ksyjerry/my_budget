@@ -52,6 +52,16 @@ interface KPI {
   year_month?: string;
 }
 
+function fmtSync(iso: string | null): string {
+  if (!iso) return "-";
+  try {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  } catch {
+    return iso;
+  }
+}
+
 function fmtKRW(v: number): string {
   if (v === 0) return "-";
   const abs = Math.abs(v);
@@ -90,6 +100,9 @@ export default function BudgetTrackingPage() {
 
   // Filters
   const [availableYms, setAvailableYms] = useState<string[]>([]);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [filterYm, setFilterYm] = useState("");
   const [filterProject, setFilterProject] = useState("");
   const [filterEl, setFilterEl] = useState("");
@@ -102,23 +115,55 @@ export default function BudgetTrackingPage() {
     departments: [],
   });
 
-  // Load filter options on mount
+  // Load filter options + admin check on mount
   useEffect(() => {
-    const loadOpts = async () => {
+    const load = async () => {
       try {
         const token = getStoredToken();
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE}/api/v1/tracking/filter-options`, { headers });
-        if (!res.ok) return;
-        const data = await res.json();
-        setFilterOpts(data);
+
+        const [optsRes, accessRes] = await Promise.all([
+          fetch(`${API_BASE}/api/v1/tracking/filter-options`, { headers }),
+          fetch(`${API_BASE}/api/v1/tracking/access`, { headers }),
+        ]);
+        if (optsRes.ok) {
+          setFilterOpts(await optsRes.json());
+        }
+        if (accessRes.ok) {
+          const accessData = await accessRes.json();
+          setIsAdmin(accessData.scope === "all");
+        }
       } catch {
         /* ignore */
       }
     };
-    loadOpts();
+    load();
   }, []);
+
+  const handleSync = async () => {
+    if (!confirm("Azure TBA 데이터를 새로 동기화합니다. 약 20~30초 소요됩니다.")) return;
+    setSyncing(true);
+    try {
+      const token = getStoredToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/api/v1/tracking/sync`, {
+        method: "POST",
+        headers,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`동기화 실패: ${err.detail || "오류"}`);
+        return;
+      }
+      const data = await res.json();
+      alert(`동기화 완료: ${data.synced.toLocaleString()}건 (${data.elapsed_sec}초)`);
+      await loadTracking();
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const loadTracking = useCallback(async () => {
     setLoading(true);
@@ -145,6 +190,7 @@ export default function BudgetTrackingPage() {
       setKpi(data.kpi);
       setProjects(data.projects || []);
       if (Array.isArray(data.year_months)) setAvailableYms(data.year_months);
+      if (data.last_sync !== undefined) setLastSync(data.last_sync);
     } finally {
       setLoading(false);
     }
@@ -219,9 +265,19 @@ export default function BudgetTrackingPage() {
             )}
           </p>
         </div>
-        <span className="text-[11px] text-pwc-gray-600">
-          Source: BI_PARTNERREPORT_TBA_V (Azure)
-        </span>
+        <div className="flex items-center gap-3 text-[11px] text-pwc-gray-600">
+          <span>Last sync: {fmtSync(lastSync)}</span>
+          {isAdmin && (
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="px-3 py-1 text-[11px] font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors disabled:opacity-50"
+            >
+              {syncing ? "동기화 중..." : "↻ 새로고침"}
+            </button>
+          )}
+          <span>Source: BI_PARTNERREPORT_TBA_V</span>
+        </div>
       </div>
 
       {/* Filter Bar */}
