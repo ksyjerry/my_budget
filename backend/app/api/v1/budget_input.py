@@ -26,6 +26,7 @@ SERVICE_TYPES = [
     {"code": "ESG", "name": "ESG"},
     {"code": "VAL", "name": "Valuation"},
     {"code": "TRADE", "name": "통상자문"},
+    {"code": "ACT", "name": "보험계리"},
     {"code": "ETC", "name": "기타"},
 ]
 

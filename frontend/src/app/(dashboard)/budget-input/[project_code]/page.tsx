@@ -1284,6 +1284,7 @@ function Step1Form({
               <option value="ESG">ESG</option>
               <option value="VAL">Valuation</option>
               <option value="TRADE">통상자문</option>
+              <option value="ACT">보험계리</option>
               <option value="ETC">기타</option>
             </select>
           </div>
