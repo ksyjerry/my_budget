@@ -46,6 +46,21 @@ def _scheduled_client_sync():
         db.close()
 
 
+def _scheduled_employee_sync():
+    """매일 06:05 KST 에 Azure → Postgres 직원 동기화."""
+    from app.db.session import SessionLocal
+    from app.services.sync_service import sync_employees
+    logger = logging.getLogger("scheduler")
+    db = SessionLocal()
+    try:
+        n = sync_employees(db)
+        logger.info(f"Scheduled employee sync: {n} employees")
+    except Exception as e:
+        logger.error(f"Scheduled employee sync failed: {e}")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def start_scheduler():
     if not _scheduler.running:
@@ -55,6 +70,14 @@ def start_scheduler():
             hour=6,
             minute=0,
             id="sync_clients",
+            replace_existing=True,
+        )
+        _scheduler.add_job(
+            _scheduled_employee_sync,
+            "cron",
+            hour=6,
+            minute=5,
+            id="sync_employees",
             replace_existing=True,
         )
         _scheduler.start()
