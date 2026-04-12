@@ -53,16 +53,67 @@ test.describe("Budget Tracking — Partner Only", () => {
     expect(emVisible).toBe(true);
   });
 
-  test("UI — Non-partner sees access denied", async ({ page }) => {
+  test("API — Non-partner receives 403 from /tracking/projects", async ({ request }) => {
     // 320915 지해나 (Staff) — partner_access_config에 없음
-    await login(page, "320915");
+    const loginRes = await request.post("http://localhost:3001/api/v1/auth/login", {
+      data: { empno: "320915" },
+    });
+    const { token } = await loginRes.json();
 
-    await page.goto("/projects/tracking");
-    await page.waitForTimeout(3000);
+    const res = await request.get("http://localhost:3001/api/v1/tracking/projects", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log("Non-partner status:", res.status());
+    expect(res.status()).toBe(403);
 
-    // "Partner 권한" 문구가 있는지 확인
-    const deniedText = await page.locator("text=Partner 권한").first().isVisible().catch(() => false);
-    console.log("Access denied shown:", deniedText);
-    expect(deniedText).toBe(true);
+    const accessRes = await request.get("http://localhost:3001/api/v1/tracking/access", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const accessData = await accessRes.json();
+    console.log("Non-partner access:", accessData);
+    expect(accessData.has_access).toBe(false);
+  });
+
+  test("API — Filter by year_month returns that specific month", async ({ request }) => {
+    const loginRes = await request.post("http://localhost:3001/api/v1/auth/login", {
+      data: { empno: "120507" },
+    });
+    const { token } = await loginRes.json();
+
+    // 먼저 사용 가능한 월 목록 조회
+    const res1 = await request.get("http://localhost:3001/api/v1/tracking/projects", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data1 = await res1.json();
+    const availableYms: string[] = data1.year_months || [];
+    console.log("Available year_months:", availableYms);
+    expect(availableYms.length).toBeGreaterThan(0);
+
+    if (availableYms.length > 1) {
+      const targetYm = availableYms[1]; // 두 번째 월 (최신 외)
+      const res2 = await request.get(
+        `http://localhost:3001/api/v1/tracking/projects?year_month=${targetYm}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data2 = await res2.json();
+      console.log(`Filtered to ${targetYm}, project count: ${data2.kpi?.project_count}`);
+      expect(data2.kpi?.year_month).toBe(targetYm);
+    }
+  });
+
+  test("API — /tracking/filter-options returns EL/PM/departments", async ({ request }) => {
+    const loginRes = await request.post("http://localhost:3001/api/v1/auth/login", {
+      data: { empno: "120507" },
+    });
+    const { token } = await loginRes.json();
+
+    const res = await request.get("http://localhost:3001/api/v1/tracking/filter-options", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    const data = await res.json();
+    console.log(`Filter options — projects: ${data.projects.length}, els: ${data.els.length}, depts: ${data.departments.length}`);
+    expect(Array.isArray(data.projects)).toBe(true);
+    expect(Array.isArray(data.els)).toBe(true);
   });
 });

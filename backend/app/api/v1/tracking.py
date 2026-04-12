@@ -40,10 +40,19 @@ def _get_allowed_project_codes(db: Session, user: dict) -> list[str]:
 
 @router.get("/tracking/projects")
 def get_tracking_projects(
+    year_month: Optional[str] = None,
+    project_code: Optional[str] = None,
+    el_empno: Optional[str] = None,
+    pm_empno: Optional[str] = None,
+    department: Optional[str] = None,
     db: Session = Depends(get_db),
     user: Optional[dict] = Depends(get_optional_user),
 ):
-    """Partner의 프로젝트별 Budget Amount vs Actual Amount 추적."""
+    """Partner의 프로젝트별 Budget Amount vs Actual Amount 추적.
+
+    - year_month: 특정 월 (YYYYMM) 기준. 미지정 시 최신 월.
+    - project_code / el_empno / pm_empno / department: 추가 필터
+    """
     if not user:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
@@ -53,14 +62,45 @@ def get_tracking_projects(
 
     allowed_codes = _get_allowed_project_codes(db, user)
     if not allowed_codes:
-        return {"kpi": {}, "projects": []}
+        return {"kpi": {}, "projects": [], "year_months": []}
 
-    # Azure TBA에서 최신 월 데이터 조회
-    latest_map = azure_service.get_tba_latest_by_projects(allowed_codes)
+    # 프로젝트 사전 필터 (DB 레벨)
+    proj_query = db.query(Project).filter(Project.project_code.in_(allowed_codes))
+    if project_code:
+        proj_query = proj_query.filter(Project.project_code == project_code)
+    if el_empno:
+        proj_query = proj_query.filter(Project.el_empno == el_empno)
+    if pm_empno:
+        proj_query = proj_query.filter(Project.pm_empno == pm_empno)
+    if department:
+        proj_query = proj_query.filter(Project.department == department)
 
-    # 프로젝트 정보 join
-    projects = db.query(Project).filter(Project.project_code.in_(allowed_codes)).all()
-    proj_map = {p.project_code: p for p in projects}
+    filtered_projects = proj_query.all()
+    filtered_codes = [p.project_code for p in filtered_projects]
+    proj_map = {p.project_code: p for p in filtered_projects}
+
+    if not filtered_codes:
+        return {"kpi": {}, "projects": [], "year_months": []}
+
+    # Azure TBA 조회 — 전체 월별 데이터
+    all_tba = azure_service.get_tba_by_projects(filtered_codes)
+
+    # 사용 가능한 year_month 목록 (최신순)
+    available_yms = sorted({r["year_month"] for r in all_tba}, reverse=True)
+
+    # year_month 필터 적용
+    if year_month:
+        selected_tba = [r for r in all_tba if r["year_month"] == year_month]
+    else:
+        # 미지정 시 프로젝트별 최신월
+        latest: dict[str, dict] = {}
+        for r in all_tba:
+            pc = r["project_code"]
+            if pc not in latest or r["year_month"] > latest[pc]["year_month"]:
+                latest[pc] = r
+        selected_tba = list(latest.values())
+
+    tba_map = {r["project_code"]: r for r in selected_tba}
 
     rows = []
     total_revenue = 0.0
@@ -69,41 +109,24 @@ def get_tracking_projects(
     total_std_cost = 0.0
     total_em = 0.0
 
-    for pc in allowed_codes:
-        tba = latest_map.get(pc)
+    for pc in filtered_codes:
+        tba = tba_map.get(pc)
         proj = proj_map.get(pc)
         if not proj:
             continue
-        if not tba:
-            # TBA 데이터 없음 — 빈 값으로 표시
-            rows.append({
-                "project_code": pc,
-                "project_name": proj.project_name or "",
-                "el_name": proj.el_name or "",
-                "pm_name": proj.pm_name or "",
-                "year_month": "",
-                "revenue": 0,
-                "budget_hours": 0,
-                "actual_hours": 0,
-                "std_cost": 0,
-                "em": 0,
-                "progress_hours": 0,
-                "progress_cost": 0,
-            })
-            continue
 
-        rev = tba["revenue"]
-        bh = tba["budget_hours"]
-        ah = tba["actual_hours"]
-        sc = tba["std_cost"]
-        em = tba["em"]
+        rev = tba["revenue"] if tba else 0
+        bh = tba["budget_hours"] if tba else 0
+        ah = tba["actual_hours"] if tba else 0
+        sc = tba["std_cost"] if tba else 0
+        em = tba["em"] if tba else 0
 
         rows.append({
             "project_code": pc,
             "project_name": proj.project_name or "",
             "el_name": proj.el_name or "",
             "pm_name": proj.pm_name or "",
-            "year_month": tba["year_month"],
+            "year_month": tba["year_month"] if tba else "",
             "revenue": rev,
             "budget_hours": bh,
             "actual_hours": ah,
@@ -119,8 +142,8 @@ def get_tracking_projects(
         total_std_cost += sc
         total_em += em
 
-    # Revenue 기준 내림차순
-    rows.sort(key=lambda x: -x["revenue"])
+    # Revenue 기준 내림차순 (동일 시 EM 내림차순)
+    rows.sort(key=lambda x: (-x["revenue"], -x["em"]))
 
     return {
         "kpi": {
@@ -131,8 +154,10 @@ def get_tracking_projects(
             "total_em": total_em,
             "em_margin": round(total_em / total_revenue * 100, 1) if total_revenue else 0,
             "project_count": len(rows),
+            "year_month": year_month or (available_yms[0] if available_yms else ""),
         },
         "projects": rows,
+        "year_months": available_yms,
     }
 
 
@@ -172,6 +197,58 @@ def get_tracking_project_detail(
         },
         "monthly": monthly,
         "latest": monthly[-1] if monthly else None,
+    }
+
+
+@router.get("/tracking/filter-options")
+def get_tracking_filter_options(
+    db: Session = Depends(get_db),
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    """Tracking 페이지 필터용 EL/PM/본부/프로젝트 목록 (사용자 scope 내)."""
+    if not user:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+
+    cfg = _get_partner_access(db, user["empno"])
+    if not cfg:
+        raise HTTPException(status_code=403, detail="Partner 권한이 필요합니다.")
+
+    allowed_codes = _get_allowed_project_codes(db, user)
+    if not allowed_codes:
+        return {"projects": [], "els": [], "pms": [], "departments": []}
+
+    projects = db.query(Project).filter(Project.project_code.in_(allowed_codes)).all()
+
+    proj_opts = sorted(
+        [
+            {"value": p.project_code, "label": f"{p.project_code} {p.project_name or ''}"}
+            for p in projects
+        ],
+        key=lambda x: x["label"],
+    )
+
+    el_map: dict[str, str] = {}
+    pm_map: dict[str, str] = {}
+    dept_set: set[str] = set()
+    for p in projects:
+        if p.el_empno and p.el_name:
+            el_map[p.el_empno] = p.el_name
+        if p.pm_empno and p.pm_name:
+            pm_map[p.pm_empno] = p.pm_name
+        if p.department:
+            dept_set.add(p.department)
+
+    return {
+        "projects": proj_opts,
+        "els": sorted(
+            [{"value": k, "label": f"{v} ({k})"} for k, v in el_map.items()],
+            key=lambda x: x["label"],
+        ),
+        "pms": sorted(
+            [{"value": k, "label": f"{v} ({k})"} for k, v in pm_map.items()],
+            key=lambda x: x["label"],
+        ),
+        "departments": sorted([{"value": d, "label": d} for d in dept_set], key=lambda x: x["label"]),
     }
 
 

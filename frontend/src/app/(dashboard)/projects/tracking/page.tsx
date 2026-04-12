@@ -1,9 +1,21 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { getStoredToken } from "@/lib/auth";
+import FilterBar from "@/components/filters/FilterBar";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+interface FilterOption {
+  value: string;
+  label: string;
+}
+interface FilterOptions {
+  projects: FilterOption[];
+  els: FilterOption[];
+  pms: FilterOption[];
+  departments: FilterOption[];
+}
 
 interface TrackingProject {
   project_code: string;
@@ -37,6 +49,7 @@ interface KPI {
   total_em: number;
   em_margin: number;
   project_count: number;
+  year_month?: string;
 }
 
 function fmtKRW(v: number): string {
@@ -75,29 +88,71 @@ export default function BudgetTrackingPage() {
   const [monthly, setMonthly] = useState<MonthlyRow[]>([]);
   const [search, setSearch] = useState("");
 
+  // Filters
+  const [availableYms, setAvailableYms] = useState<string[]>([]);
+  const [filterYm, setFilterYm] = useState("");
+  const [filterProject, setFilterProject] = useState("");
+  const [filterEl, setFilterEl] = useState("");
+  const [filterPm, setFilterPm] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+  const [filterOpts, setFilterOpts] = useState<FilterOptions>({
+    projects: [],
+    els: [],
+    pms: [],
+    departments: [],
+  });
+
+  // Load filter options on mount
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    const loadOpts = async () => {
       try {
         const token = getStoredToken();
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-
-        const res = await fetch(`${API_BASE}/api/v1/tracking/projects`, { headers });
-        if (res.status === 403) {
-          setAccessDenied(true);
-          return;
-        }
+        const res = await fetch(`${API_BASE}/api/v1/tracking/filter-options`, { headers });
         if (!res.ok) return;
         const data = await res.json();
-        setKpi(data.kpi);
-        setProjects(data.projects || []);
-      } finally {
-        setLoading(false);
+        setFilterOpts(data);
+      } catch {
+        /* ignore */
       }
     };
-    load();
+    loadOpts();
   }, []);
+
+  const loadTracking = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = getStoredToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const params = new URLSearchParams();
+      if (filterYm) params.set("year_month", filterYm);
+      if (filterProject) params.set("project_code", filterProject);
+      if (filterEl) params.set("el_empno", filterEl);
+      if (filterPm) params.set("pm_empno", filterPm);
+      if (filterDept) params.set("department", filterDept);
+
+      const url = `${API_BASE}/api/v1/tracking/projects${params.toString() ? "?" + params : ""}`;
+      const res = await fetch(url, { headers });
+      if (res.status === 403) {
+        setAccessDenied(true);
+        return;
+      }
+      if (!res.ok) return;
+      const data = await res.json();
+      setKpi(data.kpi);
+      setProjects(data.projects || []);
+      if (Array.isArray(data.year_months)) setAvailableYms(data.year_months);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterYm, filterProject, filterEl, filterPm, filterDept]);
+
+  useEffect(() => {
+    loadTracking();
+  }, [loadTracking]);
 
   useEffect(() => {
     if (!selectedCode) {
@@ -141,6 +196,14 @@ export default function BudgetTrackingPage() {
     );
   }
 
+  // Year-month options for FilterBar
+  const ymOptions = useMemo(() => {
+    return availableYms.map((ym) => ({
+      value: ym,
+      label: `${ym.slice(0, 4)}-${ym.slice(4, 6)}`,
+    }));
+  }, [availableYms]);
+
   return (
     <div className="p-6 space-y-4">
       {/* Title */}
@@ -149,12 +212,58 @@ export default function BudgetTrackingPage() {
           <h2 className="text-lg font-bold text-pwc-black">Budget Tracking</h2>
           <p className="text-xs text-pwc-gray-600 mt-0.5">
             담당 프로젝트의 Revenue vs Cost vs Engagement Margin 추적
+            {kpi?.year_month && (
+              <span className="ml-2 text-pwc-orange font-semibold">
+                기준: {kpi.year_month.slice(0, 4)}-{kpi.year_month.slice(4, 6)}
+              </span>
+            )}
           </p>
         </div>
         <span className="text-[11px] text-pwc-gray-600">
           Source: BI_PARTNERREPORT_TBA_V (Azure)
         </span>
       </div>
+
+      {/* Filter Bar */}
+      <FilterBar
+        filters={[
+          {
+            name: "year_month",
+            label: "연월",
+            options: ymOptions,
+            value: filterYm,
+            onChange: setFilterYm,
+          },
+          {
+            name: "project",
+            label: "Project",
+            options: filterOpts.projects,
+            value: filterProject,
+            onChange: setFilterProject,
+          },
+          {
+            name: "el",
+            label: "EL",
+            options: filterOpts.els,
+            value: filterEl,
+            onChange: setFilterEl,
+          },
+          {
+            name: "pm",
+            label: "PM",
+            options: filterOpts.pms,
+            value: filterPm,
+            onChange: setFilterPm,
+          },
+          {
+            name: "dept",
+            label: "EL소속본부",
+            options: filterOpts.departments,
+            value: filterDept,
+            onChange: setFilterDept,
+          },
+        ]}
+      />
 
       {/* KPI Cards */}
       {kpi && (
