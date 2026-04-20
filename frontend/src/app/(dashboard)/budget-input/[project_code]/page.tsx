@@ -1271,7 +1271,7 @@ function Step1Form({
               travel_hours: p.travel_hours as number,
               total_budget_hours: p.total_budget_hours as number,
               template_status: (p.template_status as string) || "작성중",
-              service_type: (p.service_type as string) || "AUDIT",
+              service_type: (p.service_type as string) || project.service_type || "AUDIT",
             });
             // 클라이언트 코드도 연동
             if (p.client_code) {
