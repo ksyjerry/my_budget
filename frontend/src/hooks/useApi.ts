@@ -1,15 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getStoredToken } from "@/lib/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
-function getAuthHeaders(): Record<string, string> {
-  const token = getStoredToken();
-  if (!token) return {};
-  return { Authorization: `Bearer ${token}` };
-}
 
 // Generic fetch hook
 export function useApi<T>(path: string | null) {
@@ -23,11 +16,9 @@ export function useApi<T>(path: string | null) {
     setError(null);
     try {
       const res = await fetch(`${API_BASE}${path}`, {
-        headers: getAuthHeaders(),
+        credentials: "include",
       });
       if (res.status === 401) {
-        // Token expired or invalid — clear auth and redirect
-        localStorage.removeItem("auth_user");
         window.location.href = "/login";
         return;
       }
@@ -195,6 +186,9 @@ export interface ProjectDetail {
     specialist_hours: number;
     et_controllable_budget: number;
     total_budget_hours: number;
+    rm_hours?: number;
+    ra_elpm_hours?: number;
+    travel_hours?: number;
   };
   details: {
     category: string;

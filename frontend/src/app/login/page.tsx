@@ -9,17 +9,14 @@ export default function LoginPage() {
   const [empno, setEmpno] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { login, isAuthenticated, loading } = useAuth();
+  const { user, login, isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
-  // Already logged in — redirect based on role
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      const stored = localStorage.getItem("auth_user");
-      const role = stored ? JSON.parse(stored).role : "";
-      router.replace(role === "Staff" ? "/overview-person" : "/");
+    if (!loading && isAuthenticated && user) {
+      router.replace(user.role === "staff" ? "/overview-person" : "/");
     }
-  }, [loading, isAuthenticated, router]);
+  }, [loading, isAuthenticated, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,15 +24,11 @@ export default function LoginPage() {
       setError("사번을 입력해주세요.");
       return;
     }
-
     setError("");
     setSubmitting(true);
     try {
-      await login(empno.trim());
-      // role에 따라 리다이렉트
-      const stored = localStorage.getItem("auth_user");
-      const role = stored ? JSON.parse(stored).role : "";
-      router.replace(role === "Staff" ? "/overview-person" : "/");
+      const u = await login(empno.trim());
+      router.replace(u.role === "staff" ? "/overview-person" : "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
     } finally {
@@ -48,7 +41,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F3F3]">
       <div className="w-full max-w-[440px] bg-white rounded-xl shadow-sm border border-pwc-gray-100/60 p-10">
-        {/* Logo */}
         <div className="flex justify-center mb-5">
           <Image
             src="/pwc-logo.png"
@@ -60,7 +52,6 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Title */}
         <h1 className="text-2xl font-bold text-center text-pwc-black mb-1">
           My Budget+
         </h1>
@@ -68,7 +59,6 @@ export default function LoginPage() {
           사번을 입력하여 서비스를 이용하세요.
         </p>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-semibold text-pwc-black mb-2">
@@ -84,14 +74,12 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Error message */}
           {error && (
             <div className="text-sm text-pwc-red bg-red-50 border border-red-100 rounded-lg px-4 py-2.5">
               {error}
             </div>
           )}
 
-          {/* Submit button */}
           <button
             type="submit"
             disabled={submitting}

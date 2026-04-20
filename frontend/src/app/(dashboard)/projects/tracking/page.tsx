@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { getStoredToken } from "@/lib/auth";
+
 import FilterBar from "@/components/filters/FilterBar";
 import MonthlyTrendChart from "@/components/charts/MonthlyTrendChart";
 
@@ -124,13 +124,9 @@ export default function BudgetTrackingPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = getStoredToken();
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-
         const [optsRes, accessRes] = await Promise.all([
-          fetch(`${API_BASE}/api/v1/tracking/filter-options`, { headers }),
-          fetch(`${API_BASE}/api/v1/tracking/access`, { headers }),
+          fetch(`${API_BASE}/api/v1/tracking/filter-options`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/v1/tracking/access`, { credentials: "include" }),
         ]);
         if (optsRes.ok) {
           setFilterOpts(await optsRes.json());
@@ -150,12 +146,9 @@ export default function BudgetTrackingPage() {
     if (!confirm("Azure TBA 데이터를 새로 동기화합니다. 약 20~30초 소요됩니다.")) return;
     setSyncing(true);
     try {
-      const token = getStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/api/v1/tracking/sync`, {
         method: "POST",
-        headers,
+        credentials: "include",
       });
       if (!res.ok) {
         const err = await res.json();
@@ -173,10 +166,6 @@ export default function BudgetTrackingPage() {
   const loadTracking = useCallback(async () => {
     setLoading(true);
     try {
-      const token = getStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
       const params = new URLSearchParams();
       if (filterYm) params.set("year_month", filterYm);
       if (filterProject) params.set("project_code", filterProject);
@@ -185,7 +174,7 @@ export default function BudgetTrackingPage() {
       if (filterDept) params.set("department", filterDept);
 
       const url = `${API_BASE}/api/v1/tracking/projects${params.toString() ? "?" + params : ""}`;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { credentials: "include" });
       if (res.status === 403) {
         setAccessDenied(true);
         return;
@@ -212,10 +201,7 @@ export default function BudgetTrackingPage() {
     }
     const load = async () => {
       try {
-        const token = getStoredToken();
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE}/api/v1/tracking/projects/${selectedCode}`, { headers });
+        const res = await fetch(`${API_BASE}/api/v1/tracking/projects/${selectedCode}`, { credentials: "include" });
         if (!res.ok) return;
         const data = await res.json();
         setMonthly(data.monthly || []);

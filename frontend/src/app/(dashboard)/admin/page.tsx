@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getStoredToken } from "@/lib/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -24,20 +23,13 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
 
-  const headers = useCallback((): Record<string, string> => {
-    const token = getStoredToken();
-    const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) h["Authorization"] = `Bearer ${token}`;
-    return h;
-  }, []);
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [pRes, dRes] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/admin/partners`, { headers: headers() }),
-        fetch(`${API_BASE}/api/v1/admin/departments`, { headers: headers() }),
+        fetch(`${API_BASE}/api/v1/admin/partners`, { credentials: "include" }),
+        fetch(`${API_BASE}/api/v1/admin/departments`, { credentials: "include" }),
       ]);
       if (!pRes.ok) {
         const d = await pRes.json().catch(() => ({}));
@@ -50,7 +42,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -72,7 +64,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_BASE}/api/v1/admin/partners/${editingEmpno}`, {
         method: "PUT",
-        headers: headers(),
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scope: editScope,
           departments: editScope === "departments" ? editDepts.join(",") : "",

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import HorizontalBarChart from "@/components/charts/HorizontalBarChart";
 import DonutChart from "@/components/charts/DonutChart";
-import { getStoredToken } from "@/lib/auth";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -39,10 +39,7 @@ export default function PersonOverviewPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const token = getStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/api/v1/overview-person`, { headers });
+      const res = await fetch(`${API_BASE}/api/v1/overview-person`, { credentials: "include" });
       if (res.ok) setData(await res.json());
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -56,11 +53,8 @@ export default function PersonOverviewPage() {
       setFilteredData(null);
       return;
     }
-    const token = getStoredToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
     const params = new URLSearchParams({ project_code: selectedProject });
-    fetch(`${API_BASE}/api/v1/overview-person?${params}`, { headers })
+    fetch(`${API_BASE}/api/v1/overview-person?${params}`, { credentials: "include" })
       .then((res) => res.ok ? res.json() : null)
       .then((d) => { if (d) setFilteredData(d); })
       .catch(() => {});

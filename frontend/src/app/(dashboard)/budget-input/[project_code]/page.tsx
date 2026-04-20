@@ -1814,7 +1814,6 @@ function Step3Template({
     setAiLoading(true);
     setAiResult(null);
     try {
-      const token = localStorage.getItem("auth_user") ? JSON.parse(localStorage.getItem("auth_user")!).token : "";
       const enabledUnits = rows.filter((r) => r.enabled).map((r) => ({
         category: r.budget_category,
         unit_name: r.budget_unit,
@@ -1824,7 +1823,8 @@ function Step3Template({
       );
       const res = await fetch(`${API_BASE}/api/v1/budget-assist/suggest`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_code: projectCode,
           et_controllable: etControllable,
@@ -1847,10 +1847,10 @@ function Step3Template({
     setAiLoading(true);
     setAiResult(null);
     try {
-      const token = localStorage.getItem("auth_user") ? JSON.parse(localStorage.getItem("auth_user")!).token : "";
       const res = await fetch(`${API_BASE}/api/v1/budget-assist/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_code: projectCode,
           et_controllable: etControllable,

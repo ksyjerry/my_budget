@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getStoredToken } from "@/lib/auth";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -73,10 +73,7 @@ function DownloadButton({ item }: { item: DownloadItem }) {
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const token = getStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const response = await fetch(`${API_BASE}/api/v1/export/${item.endpoint}`, { headers });
+      const response = await fetch(`${API_BASE}/api/v1/export/${item.endpoint}`, { credentials: "include" });
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

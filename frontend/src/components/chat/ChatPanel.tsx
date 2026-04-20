@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { getStoredToken } from "@/lib/auth";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -137,12 +137,11 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
     setLoading(true);
 
     try {
-      const token = getStoredToken();
       const res = await fetch(`${API_BASE}/api/v1/chat`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message: msg }),
       });

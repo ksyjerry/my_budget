@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { getStoredToken } from "@/lib/auth";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -22,10 +22,7 @@ export default function BudgetInputPage() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const token = getStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/api/v1/budget/projects/list`, { headers });
+      const res = await fetch(`${API_BASE}/api/v1/budget/projects/list`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setAllProjects(

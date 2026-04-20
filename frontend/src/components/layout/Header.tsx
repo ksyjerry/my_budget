@@ -144,12 +144,9 @@ function ProjectDetailsDropdown({ pathname }: { pathname: string }) {
   useEffect(() => {
     const checkAccess = async () => {
       try {
-        const stored = localStorage.getItem("auth_user");
-        const token = stored ? JSON.parse(stored).token : "";
-        if (!token) return;
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const res = await fetch(`${apiBase}/api/v1/tracking/access`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
         if (res.ok) {
           const data = await res.json();
@@ -263,10 +260,10 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const isStaff = user?.role === "Staff";
+  const isStaff = user?.role === "staff";
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/login");
   };
 
