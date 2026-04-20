@@ -2179,8 +2179,10 @@ function Step3Template({
         </button>
         <div className="flex-1" />
         <button
+          disabled={categories.length === 0}
+          title={categories.length === 0 ? "해당 서비스의 관리단위가 아직 설정되지 않았습니다. 관리자에게 문의하세요." : undefined}
           onClick={() => setShowAddRow(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-pwc-black text-pwc-black rounded-lg hover:bg-pwc-gray-50 transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-pwc-black text-pwc-black rounded-lg hover:bg-pwc-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
