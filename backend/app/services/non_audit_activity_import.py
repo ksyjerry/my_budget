@@ -91,3 +91,49 @@ def parse_non_audit_activities(path: str) -> list[dict]:
             })
     wb.close()
     return results
+
+
+from sqlalchemy.orm import Session as DBSessionType
+
+from app.models.project import ServiceTaskMaster
+
+
+def import_non_audit_activities(
+    db: DBSessionType,
+    path: str,
+    *,
+    truncate: bool = True,
+) -> dict:
+    """Parse Excel and replace ServiceTaskMaster rows for the 7 non-audit services.
+
+    Returns {"inserted": int, "by_service_type": {code: count, ...}, "source_file": str}.
+
+    AUDIT rows are never touched — only non-audit codes are truncated/re-inserted.
+    """
+    rows = parse_non_audit_activities(path)
+    non_audit_codes = set(SERVICE_TYPE_SHEET_MAP.values())
+    if truncate:
+        db.query(ServiceTaskMaster).filter(
+            ServiceTaskMaster.service_type.in_(non_audit_codes)
+        ).delete(synchronize_session=False)
+        db.commit()
+    by_service_type: dict[str, int] = {code: 0 for code in non_audit_codes}
+    for r in rows:
+        db.add(ServiceTaskMaster(
+            service_type=r["service_type"],
+            task_category=r["task_category"],
+            task_name=r["task_name"],
+            activity_subcategory=r["activity_subcategory"],
+            activity_detail=r["activity_detail"],
+            budget_unit=r["budget_unit"],
+            role=r["role"],
+            sort_order=r["sort_order"],
+            source_file=r["source_file"],
+        ))
+        by_service_type[r["service_type"]] += 1
+    db.commit()
+    return {
+        "inserted": sum(by_service_type.values()),
+        "by_service_type": by_service_type,
+        "source_file": rows[0]["source_file"] if rows else None,
+    }
