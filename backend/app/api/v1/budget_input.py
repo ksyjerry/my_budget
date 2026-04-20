@@ -55,6 +55,30 @@ def get_service_tasks(service_type: str = "AUDIT", db: Session = Depends(get_db)
             "budget_unit_type": r.budget_unit_type or "",
             "sort_order": r.sort_order,
             "description": r.description or "",
+            "activity_subcategory": r.activity_subcategory or "",
+            "activity_detail": r.activity_detail or "",
+            "budget_unit": r.budget_unit or "",
+            "role": r.role or "",
+        }
+        for r in rows
+    ]
+
+
+@router.get("/master/activity-mapping")
+def get_activity_mapping(service_type: str, db: Session = Depends(get_db)):
+    """Step 2 구성원 Activity 매핑 드롭다운 소스."""
+    rows = (
+        db.query(ServiceTaskMaster)
+        .filter(ServiceTaskMaster.service_type == service_type)
+        .order_by(ServiceTaskMaster.sort_order)
+        .all()
+    )
+    return [
+        {
+            "category": r.task_category or "",
+            "subcategory": r.activity_subcategory or "",
+            "detail": r.activity_detail or "",
+            "role": r.role or "",
         }
         for r in rows
     ]
