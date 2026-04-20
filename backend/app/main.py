@@ -61,6 +61,21 @@ def _scheduled_employee_sync():
         db.close()
 
 
+def _scheduled_session_cleanup():
+    """매주 일요일 03:00 KST 에 30일 경과한 만료 세션 제거."""
+    from app.db.session import SessionLocal
+    from app.core.sessions import cleanup_expired_sessions
+    logger = logging.getLogger("scheduler")
+    db = SessionLocal()
+    try:
+        n = cleanup_expired_sessions(db, older_than_days=30)
+        logger.info(f"Scheduled session cleanup: deleted {n} rows")
+    except Exception as e:
+        logger.error(f"Scheduled session cleanup failed: {e}")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def start_scheduler():
     if not _scheduler.running:
@@ -78,6 +93,14 @@ def start_scheduler():
             hour=6,
             minute=5,
             id="sync_employees",
+            replace_existing=True,
+        )
+        _scheduler.add_job(
+            _scheduled_session_cleanup,
+            "cron",
+            day_of_week="sun",
+            hour=3,
+            id="session_cleanup",
             replace_existing=True,
         )
         _scheduler.start()
