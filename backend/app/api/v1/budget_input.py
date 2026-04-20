@@ -13,7 +13,7 @@ from app.models.budget_master import (
     ProjectMember, BudgetChangeLog,
 )
 from app.services.budget_service import upsert_project_from_client_data, bulk_insert_budget_details
-from app.api.deps import get_optional_user, require_elpm, assert_can_modify_project, assert_can_delete_project
+from app.api.deps import get_optional_user, require_elpm, require_login, assert_can_modify_project, assert_can_delete_project
 
 router = APIRouter()
 
@@ -119,6 +119,31 @@ def search_clients(q: str = "", db: Session = Depends(get_db)):
         }
         for c in results
     ]
+
+
+@router.get("/clients/{client_code}/info")
+def get_client_info(
+    client_code: str,
+    user: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """클라이언트 기본 정보 단건 조회 (Step 1 자동입력용)."""
+    c = db.query(Client).filter(Client.client_code == client_code).first()
+    if c is None:
+        raise HTTPException(status_code=404, detail="클라이언트를 찾을 수 없습니다.")
+    return {
+        "client_code": c.client_code,
+        "client_name": c.client_name,
+        "industry": c.industry or "",
+        "asset_size": c.asset_size or "",
+        "listing_status": c.listing_status or "",
+        "business_report": c.business_report or "",
+        "gaap": c.gaap or "",
+        "consolidated": c.consolidated or "",
+        "subsidiary_count": c.subsidiary_count or "",
+        "internal_control": c.internal_control or "",
+        "initial_audit": c.initial_audit or "",
+    }
 
 
 @router.get("/employees/search")
