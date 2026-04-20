@@ -1123,7 +1123,44 @@ function Step1Form({
       {/* Client Search Modal */}
       {showClientSearch && (
         <ClientSearchModal
-          onSelect={(c) => setClient({ ...client, ...c })}
+          onSelect={async (c) => {
+            const code = c.client_code;
+            if (!code) {
+              setClient({ ...client, ...c });
+              return;
+            }
+            try {
+              const r = await fetch(
+                `${API_BASE}/api/v1/budget/clients/${code}/info`,
+                { credentials: "include" }
+              );
+              if (r.ok) {
+                const info = await r.json();
+                const base = client;
+                setClient({
+                  ...base,
+                  ...c,
+                  industry: base.industry || info.industry || "",
+                  asset_size: base.asset_size || info.asset_size || "",
+                  listing_status:
+                    base.listing_status || info.listing_status || "",
+                  business_report:
+                    base.business_report || info.business_report || "",
+                  gaap: base.gaap || info.gaap || "",
+                  consolidated: base.consolidated || info.consolidated || "",
+                  subsidiary_count:
+                    base.subsidiary_count || info.subsidiary_count || "",
+                  internal_control:
+                    base.internal_control || info.internal_control || "",
+                  initial_audit: base.initial_audit || info.initial_audit || "",
+                });
+              } else {
+                setClient({ ...client, ...c });
+              }
+            } catch {
+              setClient({ ...client, ...c });
+            }
+          }}
           onClose={() => setShowClientSearch(false)}
         />
       )}
