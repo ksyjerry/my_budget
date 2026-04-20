@@ -78,3 +78,8 @@ class ServiceTaskMaster(Base):
     budget_unit_type = Column(String(50))
     sort_order = Column(Integer, default=0)
     description = Column(String(500))
+    activity_subcategory = Column(String(200))
+    activity_detail = Column(String(300))
+    budget_unit = Column(String(200))
+    role = Column(String(100))
+    source_file = Column(String(200))
