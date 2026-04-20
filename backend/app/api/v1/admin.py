@@ -222,3 +222,28 @@ def list_login_log(
         }
         for r in rows
     ]
+
+
+# ===== S1: Non-audit activity sync =====
+from app.services.non_audit_activity_import import import_non_audit_activities
+
+DEFAULT_NON_AUDIT_FIXTURE = "files/비감사 Activity 표준화_260420.xlsx"
+
+
+class NonAuditSyncRequest(BaseModel):
+    path: str | None = None
+    truncate: bool = True
+
+
+@router.post("/sync-non-audit-activities")
+def sync_non_audit_activities(
+    req: NonAuditSyncRequest,
+    user: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Re-seed ServiceTaskMaster for the 7 non-audit service_types from Excel."""
+    path = req.path or DEFAULT_NON_AUDIT_FIXTURE
+    try:
+        return import_non_audit_activities(db, path, truncate=req.truncate)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Fixture not found: {path}")
