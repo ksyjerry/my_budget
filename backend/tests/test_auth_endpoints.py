@@ -108,3 +108,36 @@ def test_staff_cannot_create_project(client):
     # 403 가 기대값. body 검증 실패 시 422 가 먼저 나올 수 있지만,
     # require_elpm dependency 는 body 검증 전에 평가되어야 하므로 401/403 여야 한다.
     assert r.status_code in (401, 403), f"expected 401/403, got {r.status_code} ({r.text})"
+
+
+def test_admin_can_list_sessions(client):
+    """Admin 세션 쿠키로 /admin/sessions 접근 성공."""
+    import os
+    admin_empno = os.environ.get("ADMIN_EMPNO", "160553")
+    # admin 전용 로그인 경로 — scope='all' 이어야 role='admin' 부여
+    r = client.post("/api/v1/auth/login", json={"empno": admin_empno})
+    if r.status_code != 200 or r.json().get("role") != "admin":
+        import pytest as _p
+        _p.skip(f"ADMIN_EMPNO {admin_empno} is not configured as admin (PartnerAccessConfig.scope='all' required)")
+    r2 = client.get("/api/v1/admin/sessions")
+    assert r2.status_code == 200
+    assert isinstance(r2.json(), list)
+
+
+def test_staff_cannot_list_sessions(client):
+    """Staff 쿠키로 /admin/sessions 접근 시 403."""
+    client.post("/api/v1/auth/login", json={"empno": STAFF_EMPNO})
+    r = client.get("/api/v1/admin/sessions")
+    assert r.status_code == 403
+
+
+def test_admin_login_log_list(client):
+    import os
+    admin_empno = os.environ.get("ADMIN_EMPNO", "160553")
+    r = client.post("/api/v1/auth/login", json={"empno": admin_empno})
+    if r.status_code != 200 or r.json().get("role") != "admin":
+        import pytest as _p
+        _p.skip("ADMIN_EMPNO not configured as admin")
+    r2 = client.get("/api/v1/admin/login-log?limit=5")
+    assert r2.status_code == 200
+    assert isinstance(r2.json(), list)

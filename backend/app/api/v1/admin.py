@@ -146,3 +146,79 @@ def list_all_departments(
             depts.add(dept)
 
     return sorted(depts)
+
+
+# ===== S0: Session / Login audit =====
+from sqlalchemy import desc
+
+from app.models.session import Session as DBSession
+from app.models.session import LoginLog
+from app.core.sessions import revoke_all_sessions_for_empno
+
+
+@router.get("/sessions")
+def list_sessions(
+    empno: str | None = None,
+    only_active: bool = True,
+    limit: int = 100,
+    user: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List active sessions (admin only). Filter by empno optional."""
+    q = db.query(DBSession)
+    if empno:
+        q = q.filter(DBSession.empno == empno)
+    if only_active:
+        q = q.filter(DBSession.revoked_at.is_(None))
+    rows = q.order_by(desc(DBSession.created_at)).limit(limit).all()
+    return [
+        {
+            "session_id": (r.session_id[:8] + "…") if r.session_id else None,
+            "empno": r.empno,
+            "role": r.role,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+            "last_seen_at": r.last_seen_at.isoformat() if r.last_seen_at else None,
+            "ip": r.ip,
+            "user_agent": r.user_agent,
+            "revoked_at": r.revoked_at.isoformat() if r.revoked_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.delete("/sessions/by-empno/{empno}")
+def revoke_all_for_user(
+    empno: str,
+    user: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Force-revoke every active session for the given empno (admin only)."""
+    n = revoke_all_sessions_for_empno(db, empno)
+    return {"revoked": n}
+
+
+@router.get("/login-log")
+def list_login_log(
+    empno: str | None = None,
+    limit: int = 200,
+    user: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Return recent login_log rows (admin only)."""
+    q = db.query(LoginLog)
+    if empno:
+        q = q.filter(LoginLog.empno == empno)
+    rows = q.order_by(desc(LoginLog.logged_in_at)).limit(limit).all()
+    return [
+        {
+            "id": r.id,
+            "empno": r.empno,
+            "logged_in_at": r.logged_in_at.isoformat() if r.logged_in_at else None,
+            "success": r.success,
+            "failure_reason": r.failure_reason,
+            "ip": r.ip,
+            "user_agent": r.user_agent,
+        }
+        for r in rows
+    ]
