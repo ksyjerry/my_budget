@@ -1084,6 +1084,8 @@ function Step1Form({
   const cField = (field: keyof ClientInfo, value: string) =>
     setClient({ ...client, [field]: value });
 
+  const isAudit = project.service_type === "AUDIT";
+
   const SelectField = ({
     label,
     value,
@@ -1141,6 +1143,11 @@ function Step1Form({
           </button>
         </div>
         <div className="grid grid-cols-3 gap-3">
+          {!isAudit && (
+            <div className="col-span-full text-xs text-pwc-gray-600 bg-pwc-gray-50 rounded-md p-2 mb-3">
+              비감사 서비스는 표준산업분류 · 자산규모 · 상장여부 3가지 정보만 입력합니다.
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
               Client Code
@@ -1183,42 +1190,54 @@ function Step1Form({
             options={LISTING_OPTIONS}
             onChange={(v) => cField("listing_status", v)}
           />
-          <SelectField
-            label="사업보고서"
-            value={client.business_report}
-            options={BUSINESS_REPORT_OPTIONS}
-            onChange={(v) => cField("business_report", v)}
-          />
-          <SelectField
-            label="GAAP"
-            value={client.gaap}
-            options={GAAP_OPTIONS}
-            onChange={(v) => cField("gaap", v)}
-          />
-          <SelectField
-            label="연결재무제표"
-            value={client.consolidated}
-            options={CONSOLIDATED_OPTIONS}
-            onChange={(v) => cField("consolidated", v)}
-          />
-          <SelectField
-            label="연결자회사수"
-            value={client.subsidiary_count}
-            options={SUBSIDIARY_OPTIONS}
-            onChange={(v) => cField("subsidiary_count", v)}
-          />
-          <SelectField
-            label="내부회계관리제도"
-            value={client.internal_control}
-            options={INTERNAL_CONTROL_OPTIONS}
-            onChange={(v) => cField("internal_control", v)}
-          />
-          <SelectField
-            label="초도/계속감사"
-            value={client.initial_audit}
-            options={AUDIT_TYPE_OPTIONS}
-            onChange={(v) => cField("initial_audit", v)}
-          />
+          {isAudit && (
+            <SelectField
+              label="사업보고서"
+              value={client.business_report}
+              options={BUSINESS_REPORT_OPTIONS}
+              onChange={(v) => cField("business_report", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="GAAP"
+              value={client.gaap}
+              options={GAAP_OPTIONS}
+              onChange={(v) => cField("gaap", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결재무제표"
+              value={client.consolidated}
+              options={CONSOLIDATED_OPTIONS}
+              onChange={(v) => cField("consolidated", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결자회사수"
+              value={client.subsidiary_count}
+              options={SUBSIDIARY_OPTIONS}
+              onChange={(v) => cField("subsidiary_count", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="내부회계관리제도"
+              value={client.internal_control}
+              options={INTERNAL_CONTROL_OPTIONS}
+              onChange={(v) => cField("internal_control", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="초도/계속감사"
+              value={client.initial_audit}
+              options={AUDIT_TYPE_OPTIONS}
+              onChange={(v) => cField("initial_audit", v)}
+            />
+          )}
         </div>
       </section>
 
