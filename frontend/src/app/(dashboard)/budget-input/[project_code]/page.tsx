@@ -181,6 +181,12 @@ export default function BudgetWizardPage() {
 
   // Step 2 state
   const [members, setMembers] = useState<Member[]>([]);
+  const [activityOptions, setActivityOptions] = useState<string[]>([
+    "재무제표기말감사",
+    "분반기검토",
+    "내부통제감사",
+    "IT감사",
+  ]);
 
   // Step 3 state
   const [budgetUnits, setBudgetUnits] = useState<BudgetUnit[]>([]);
@@ -236,6 +242,31 @@ export default function BudgetWizardPage() {
         })
         .catch(() => {});
     }
+  }, [project.service_type]);
+
+  // Load activity options for Step 2 dropdown — dynamic per service_type
+  useEffect(() => {
+    if (project.service_type === "AUDIT") {
+      setActivityOptions([
+        "재무제표기말감사",
+        "분반기검토",
+        "내부통제감사",
+        "IT감사",
+      ]);
+      return;
+    }
+    fetch(
+      `${API_BASE}/api/v1/budget/master/activity-mapping?service_type=${project.service_type}`,
+      { credentials: "include" }
+    )
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: Array<{ category: string }>) => {
+        const unique = Array.from(
+          new Set(rows.map((x) => x.category).filter(Boolean))
+        );
+        setActivityOptions(unique);
+      })
+      .catch(() => setActivityOptions([]));
   }, [project.service_type]);
 
   // Load template rows when entering Step 3
@@ -699,6 +730,7 @@ export default function BudgetWizardPage() {
             addMember={addMember}
             removeMember={removeMember}
             updateMember={updateMember}
+            activityOptions={activityOptions}
           />
         )}
         {step === 3 && (
@@ -1612,11 +1644,13 @@ function Step2Members({
   addMember,
   removeMember,
   updateMember,
+  activityOptions,
 }: {
   members: Member[];
   addMember: (role: string) => void;
   removeMember: (idx: number) => void;
   updateMember: (idx: number, field: keyof Member, value: string | number) => void;
+  activityOptions: string[];
 }) {
   // 원본 index 를 보존한 채 grade 순으로 정렬 (state 업데이트는 originalIdx 사용)
   const sortedFldt = members
@@ -1700,10 +1734,10 @@ function Step2Members({
                         }
                         className="w-full px-2 py-1 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
                       >
-                        <option value="재무제표기말감사">재무제표기말감사</option>
-                        <option value="분반기검토">분반기검토</option>
-                        <option value="내부통제감사">내부통제감사</option>
-                        <option value="IT감사">IT감사</option>
+                        <option value="">(선택)</option>
+                        {activityOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-3 py-1.5 text-center">
@@ -1793,10 +1827,10 @@ function Step2Members({
                         }
                         className="w-full px-2 py-1 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
                       >
-                        <option value="재무제표기말감사">재무제표기말감사</option>
-                        <option value="분반기검토">분반기검토</option>
-                        <option value="내부통제감사">내부통제감사</option>
-                        <option value="IT감사">IT감사</option>
+                        <option value="">(선택)</option>
+                        {activityOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-3 py-1.5 text-center">
