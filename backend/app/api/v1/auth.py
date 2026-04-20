@@ -187,8 +187,9 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def me(request: Request, db: Session = Depends(get_db)):
-    # 주의: Task 5 에서 get_current_user 를 쿠키 기반으로 교체하면 이 로컬 로직은
-    # get_current_user dependency 로 대체된다. 그 때까지는 인라인으로 처리.
+    # 인라인 쿠키 읽기: get_current_user dependency 와 동일한 로직을 반복하지만,
+    # get_current_user 는 touch_session 을 수반하고 이 엔드포인트는 응답 본문에
+    # name/department 까지 resolve 해야 하므로, /me 만은 인라인으로 유지한다.
     sid = request.cookies.get(SESSION_COOKIE_NAME)
     s = get_session(db, sid) if sid else None
     if s is None:
