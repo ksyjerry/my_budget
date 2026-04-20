@@ -5,7 +5,6 @@
 """
 import pytest
 from sqlalchemy import text
-from tests.conftest import auth_header
 
 
 # ── 데이터 레벨 검증 ──────────────────────────────
@@ -13,17 +12,17 @@ from tests.conftest import auth_header
 class TestBudgetActualConsistency:
     """Budget과 Actual이 동일 기준으로 집계되는지 DB/API 레벨 검증."""
 
-    def test_overview_api_returns_data(self, client, elpm_token):
+    def test_overview_api_returns_data(self, client, elpm_cookie):
         """Overview API가 정상 응답하는지 확인."""
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         assert res.status_code == 200
         data = res.json()
         assert "kpi" in data
         assert "projects" in data
 
-    def test_project_budget_is_contract_hours(self, client, elpm_token, db):
+    def test_project_budget_is_contract_hours(self, client, elpm_cookie, db):
         """프로젝트별 Budget이 contract_hours(총 계약시간)와 일치하는지."""
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         if not data["projects"]:
@@ -45,13 +44,13 @@ class TestBudgetActualConsistency:
             f"Project {pc}: API budget={api_budget}, DB contract_hours={db_contract}"
         )
 
-    def test_budget_actual_same_scope(self, client, elpm_token):
+    def test_budget_actual_same_scope(self, client, elpm_cookie):
         """Budget과 Actual이 동일 scope인지 검증.
 
         Budget이 Staff만이면 Actual도 Staff만이어야 함.
         Budget이 전체면 Actual도 전체여야 함.
         """
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         for proj in data["projects"][:5]:  # 상위 5개만 검증
@@ -67,9 +66,9 @@ class TestBudgetActualConsistency:
             if budget > 0 and progress > 500:
                 print(f"⚠️  {proj['project_name']}: progress={progress}% — Budget/Actual scope 불일치 가능")
 
-    def test_kpi_total_consistency(self, client, elpm_token):
+    def test_kpi_total_consistency(self, client, elpm_cookie):
         """KPI 총 계약시간과 프로젝트별 Budget 합계가 일치하는지."""
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         proj_budget_sum = sum(p["budget"] for p in data["projects"])
@@ -85,9 +84,9 @@ class TestBudgetActualConsistency:
 class TestElpmQrpTime:
     """EL/PM/QRP Time의 Budget/Actual 검증."""
 
-    def test_qrp_actual_not_always_zero(self, client, elpm_token, db):
+    def test_qrp_actual_not_always_zero(self, client, elpm_cookie, db):
         """QRP Actual이 항상 0이 아닌지 확인 (Task #8 관련)."""
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         qrp_rows = [r for r in data.get("elpm_qrp_time", []) if r["role"] == "QRP"]
@@ -98,9 +97,9 @@ class TestElpmQrpTime:
             for r in qrp_rows[:3]:
                 print(f"  {r['project_name']}: budget={r['budget']}, actual={r['actual']}")
 
-    def test_elpm_budget_matches_project_fields(self, client, elpm_token):
+    def test_elpm_budget_matches_project_fields(self, client, elpm_cookie):
         """EL/PM Budget이 projects 테이블의 el_hours/pm_hours와 일치하는지."""
-        res = client.get("/api/v1/overview", headers=auth_header(elpm_token))
+        res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         elpm_rows = data.get("elpm_qrp_time", [])
