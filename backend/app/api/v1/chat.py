@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.api.deps import get_optional_user, get_user_project_codes
+from app.api.deps import require_login, get_user_project_codes
 from app.services.llm_client import GenAIClient
 from app.services.llm_skills import execute_skill
 from app.services.llm_prompts import build_step1_prompt, build_step3_prompt
@@ -49,11 +49,9 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     req: ChatRequest,
+    user: dict = Depends(require_login),
     db: Session = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
 ):
-    if not user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
 
     t0 = time.time()
     client = _get_client()

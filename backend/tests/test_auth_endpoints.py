@@ -94,3 +94,17 @@ def test_logout_clears_cookie_and_revokes_session(client):
     r2 = client.get("/api/v1/auth/me")
     assert r2.status_code == 401
     client.cookies.clear()
+
+
+def test_staff_cannot_create_project(client):
+    client.post("/api/v1/auth/login", json={"empno": STAFF_EMPNO})
+    r = client.post("/api/v1/budget/projects", json={
+        "project_code": "TEST_S0_PJ_1",
+        "project_name": "스태프 거부 테스트",
+        "el_empno": EL_EMPNO,
+        "pm_empno": EL_EMPNO,
+        "contract_hours": 100,
+    })
+    # 403 가 기대값. body 검증 실패 시 422 가 먼저 나올 수 있지만,
+    # require_elpm dependency 는 body 검증 전에 평가되어야 하므로 401/403 여야 한다.
+    assert r.status_code in (401, 403), f"expected 401/403, got {r.status_code} ({r.text})"

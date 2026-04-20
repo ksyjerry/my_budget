@@ -15,7 +15,7 @@ from app.models.project import Project
 from app.models.budget_master import PartnerAccessConfig
 from app.services import azure_service
 from app.services.em_rate import calc_cost, calc_cost_by_code
-from app.api.deps import get_optional_user
+from app.api.deps import get_optional_user, require_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -473,16 +473,10 @@ def _sync_tba_cache(db: Session) -> dict:
 
 @router.post("/tracking/sync")
 def sync_tba_cache(
+    user: dict = Depends(require_admin),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
     """TBA 캐시 동기화 (Admin 전용)."""
-    if not user:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
-    cfg = _get_partner_access(db, user["empno"])
-    if not cfg or cfg.scope != "all":
-        raise HTTPException(status_code=403, detail="관리자(scope=all)만 동기화할 수 있습니다.")
-
     result = _sync_tba_cache(db)
     return result
 

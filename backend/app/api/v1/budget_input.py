@@ -13,7 +13,7 @@ from app.models.budget_master import (
     ProjectMember, BudgetChangeLog,
 )
 from app.services.budget_service import upsert_project_from_client_data, bulk_insert_budget_details
-from app.api.deps import get_optional_user
+from app.api.deps import get_optional_user, require_elpm, assert_can_modify_project, assert_can_delete_project
 
 router = APIRouter()
 
@@ -366,8 +366,20 @@ class BudgetTemplateSaveRequest(BaseModel):
 # ── Step 1: 프로젝트 기본정보 ────────────────────────
 
 @router.post("/projects")
-def create_project(req: ProjectCreateRequest, db: Session = Depends(get_db)):
-    """프로젝트 생성 (Step 1)."""
+def create_project(
+    req: ProjectCreateRequest,
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
+    """프로젝트 생성 (Step 1) — EL/PM 또는 관리자만 가능."""
+    # 관리자가 아닌 경우, 본인이 EL 또는 PM 인 프로젝트만 생성 가능
+    if user["role"] != "admin":
+        if user["empno"] not in (req.el_empno or "", req.pm_empno or ""):
+            raise HTTPException(
+                status_code=403,
+                detail="본인이 EL 또는 PM 인 프로젝트만 생성할 수 있습니다.",
+            )
+
     existing = db.query(Project).filter(Project.project_code == req.project_code).first()
     if existing:
         raise HTTPException(400, f"Project '{req.project_code}' already exists. Use PUT to update.")
@@ -392,8 +404,14 @@ def create_project(req: ProjectCreateRequest, db: Session = Depends(get_db)):
 
 
 @router.put("/projects/{project_code}")
-def update_project(project_code: str, req: ProjectCreateRequest, db: Session = Depends(get_db)):
-    """프로젝트 수정 (Step 1)."""
+def update_project(
+    project_code: str,
+    req: ProjectCreateRequest,
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
+    """프로젝트 수정 (Step 1) — EL/PM 또는 관리자만 가능."""
+    assert_can_modify_project(db, user, project_code)
     data = req.model_dump()
     data["project_code"] = project_code
     data["client_code"] = data.get("client_code") or project_code.split("-")[0]
@@ -412,23 +430,15 @@ def update_project(project_code: str, req: ProjectCreateRequest, db: Session = D
 @router.delete("/projects/{project_code}")
 def delete_project(
     project_code: str,
+    user: dict = Depends(require_elpm),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
     """프로젝트 삭제 (EL 또는 관리자만 가능)."""
+    assert_can_delete_project(db, user, project_code)
+
     proj = db.query(Project).filter(Project.project_code == project_code).first()
     if not proj:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
-
-    # 권한 체크: 해당 프로젝트의 EL이거나 관리자(scope=all)만 삭제 가능
-    if user:
-        from app.models.budget_master import PartnerAccessConfig
-        cfg = db.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == user["empno"]).first()
-        is_admin = cfg and cfg.scope == "all"
-        is_el = proj.el_empno == user["empno"]
-        if not is_admin and not is_el:
-            raise HTTPException(status_code=403, detail="해당 프로젝트의 EL 또는 관리자만 삭제할 수 있습니다.")
 
     # 관련 데이터 삭제
     db.query(BudgetDetail).filter(BudgetDetail.project_code == project_code).delete()
@@ -527,9 +537,11 @@ def get_members(project_code: str, db: Session = Depends(get_db)):
 def save_members(
     project_code: str,
     members: list[MemberRequest],
+    user: dict = Depends(require_elpm),
     db: Session = Depends(get_db),
 ):
-    """구성원 일괄 저장 (기존 삭제 후 재삽입)."""
+    """구성원 일괄 저장 (기존 삭제 후 재삽입) — EL/PM 또는 관리자만 가능."""
+    assert_can_modify_project(db, user, project_code)
     db.query(ProjectMember).filter(ProjectMember.project_code == project_code).delete()
     for i, m in enumerate(members):
         db.add(ProjectMember(
@@ -588,9 +600,11 @@ def get_template(project_code: str, db: Session = Depends(get_db)):
 def save_template(
     project_code: str,
     req: BudgetTemplateSaveRequest,
+    user: dict = Depends(require_elpm),
     db: Session = Depends(get_db),
 ):
-    """Budget Template 저장."""
+    """Budget Template 저장 — EL/PM 또는 관리자만 가능."""
+    assert_can_modify_project(db, user, project_code)
     # budget_details로 변환
     details = []
     for row in req.rows:

@@ -6,17 +6,9 @@ from typing import Optional
 
 from app.db.session import get_db
 from app.models.budget_master import PartnerAccessConfig
-from app.api.deps import get_optional_user
+from app.api.deps import require_admin
 
 router = APIRouter()
-
-# 관리자 접근 가능한 사번
-ADMIN_EMPNOS = {"170661", "160553", "120507"}
-
-
-def _require_admin(user: Optional[dict]):
-    if not user or user["empno"] not in ADMIN_EMPNOS:
-        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
 
 
 class ScopeUpdate(BaseModel):
@@ -26,11 +18,10 @@ class ScopeUpdate(BaseModel):
 
 @router.get("/partners")
 def list_partners(
+    user: dict = Depends(require_admin),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
     """파트너(EL/PM) 목록 + 현재 scope 설정. Azure 캐시 + PostgreSQL 병합."""
-    _require_admin(user)
 
     from app.models.project import Project
     from app.services import azure_service
@@ -90,10 +81,9 @@ def list_partners(
 @router.get("/partners/{empno}")
 def get_partner_config(
     empno: str,
+    user: dict = Depends(require_admin),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
-    _require_admin(user)
     cfg = db.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == empno).first()
     if not cfg:
         return {"empno": empno, "scope": "self", "departments": ""}
@@ -104,12 +94,10 @@ def get_partner_config(
 def update_partner_config(
     empno: str,
     body: ScopeUpdate,
+    user: dict = Depends(require_admin),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
     """파트너의 접근 범위 업데이트."""
-    _require_admin(user)
-
     if body.scope not in ("self", "departments", "all"):
         raise HTTPException(status_code=400, detail="scope는 self, departments, all 중 하나여야 합니다.")
 
@@ -135,11 +123,10 @@ def update_partner_config(
 
 @router.get("/departments")
 def list_all_departments(
+    user: dict = Depends(require_admin),
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_optional_user),
 ):
     """전체 본부 목록 (PostgreSQL + Azure 병합)."""
-    _require_admin(user)
 
     from sqlalchemy import distinct
     from app.models.project import Project

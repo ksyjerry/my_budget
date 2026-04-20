@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func as sa_func
 
 from app.db.session import get_db
-from app.api.deps import get_optional_user
+from app.api.deps import require_login
 from app.models.project import Project
 from app.models.budget import BudgetDetail
 
@@ -151,11 +151,9 @@ def _get_client():
 @router.post("/budget-assist/suggest", response_model=SuggestResponse)
 async def suggest_budget(
     req: SuggestRequest,
+    user: dict = Depends(require_login),
     db: Session = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
 ):
-    if not user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
 
     t0 = time.time()
     client = _get_client()
@@ -242,11 +240,9 @@ async def suggest_budget(
 @router.post("/budget-assist/validate", response_model=ValidateResponse)
 async def validate_budget(
     req: ValidateRequest,
+    user: dict = Depends(require_login),
     db: Session = Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
 ):
-    if not user:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
 
     t0 = time.time()
     client = _get_client()

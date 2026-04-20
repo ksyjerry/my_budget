@@ -4,6 +4,7 @@ import tempfile
 import os
 
 from app.db.session import get_db
+from app.api.deps import require_elpm
 from app.services.excel_parser import parse_budget_template, parse_budget_db_file
 from app.services.budget_service import upsert_project_from_client_data, bulk_insert_budget_details
 
@@ -11,7 +12,11 @@ router = APIRouter()
 
 
 @router.post("/upload")
-async def upload_budget_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_budget_file(
+    file: UploadFile = File(...),
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
     """Budget Excel 파일 업로드 및 파싱."""
     if not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Excel 파일만 업로드 가능합니다.")
