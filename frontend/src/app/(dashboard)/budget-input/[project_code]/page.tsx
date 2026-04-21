@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { gradeRank } from "@/lib/grade";
 import {
@@ -155,10 +155,14 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 export default function BudgetWizardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectCode = params.project_code as string;
   const isNew = projectCode === "new";
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const s = parseInt(searchParams.get("step") ?? "1", 10);
+    return s >= 1 && s <= 3 ? s : 1;
+  });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -412,7 +416,7 @@ export default function BudgetWizardPage() {
       setMessage("Step 1 저장 완료");
 
       if (isNew && data.project_code) {
-        router.replace(`/budget-input/${data.project_code}`);
+        router.replace(`/budget-input/${data.project_code}?step=${step}`);
       }
     } catch {
       setMessage("저장 중 오류 발생");
@@ -545,7 +549,7 @@ export default function BudgetWizardPage() {
 
       setMessage(status === "작성완료" ? "등록 완료!" : "임시 저장 완료");
       if (isNew && savedCode) {
-        router.replace(`/budget-input/${savedCode}`);
+        router.replace(`/budget-input/${savedCode}?step=${step}`);
       }
     } catch {
       setMessage("저장 중 오류 발생");
@@ -756,6 +760,15 @@ export default function BudgetWizardPage() {
             updateMember={updateMember}
             activityOptions={activityOptions}
             projectCode={project.project_code}
+            onMembersImported={async () => {
+              const code = project.project_code || projectCode;
+              if (!code || code === "new") return;
+              const r = await fetch(`${API_BASE}/api/v1/budget/projects/${code}/members`);
+              if (r.ok) {
+                const data = await r.json();
+                if (Array.isArray(data)) setMembers(data);
+              }
+            }}
           />
         )}
         {step === 3 && (
@@ -1775,6 +1788,7 @@ function Step2Members({
   updateMember,
   activityOptions,
   projectCode,
+  onMembersImported,
 }: {
   members: Member[];
   addMember: (role: string) => void;
@@ -1782,6 +1796,7 @@ function Step2Members({
   updateMember: (idx: number, field: keyof Member, value: string | number) => void;
   activityOptions: string[];
   projectCode: string;
+  onMembersImported?: () => Promise<void>;
 }) {
   async function handleExportMembers() {
     const res = await fetch(
@@ -1825,7 +1840,7 @@ function Step2Members({
           ).join("\n");
       }
       alert(msg);
-      window.location.reload();
+      if (onMembersImported) await onMembersImported();
     } catch (err) {
       alert(`업로드 오류: ${err instanceof Error ? err.message : "알 수 없음"}`);
     }
