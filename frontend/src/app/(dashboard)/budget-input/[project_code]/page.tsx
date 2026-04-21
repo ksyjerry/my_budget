@@ -2145,6 +2145,20 @@ function Step3Template({
   projectCode: string;
   clientInfo: ClientInfo;
 }) {
+  const [viewMode, setViewMode] = useState<"month" | "quarter">("month");
+  const QUARTERS = useMemo(() => {
+    const out: { label: string; months: string[] }[] = [];
+    for (let i = 0; i < MONTHS.length; i += 3) {
+      const slice = MONTHS.slice(i, i + 3);
+      if (slice.length === 0) break;
+      const startMonth = parseInt(slice[0].slice(5), 10);
+      const endMonth = parseInt(slice[slice.length - 1].slice(5), 10);
+      const qIdx = i / 3 + 1;
+      out.push({ label: `${qIdx}Q (${startMonth}-${endMonth}월)`, months: slice });
+    }
+    return out;
+  }, []);
+
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{ type: "suggest" | "validate"; data: Record<string, unknown> } | null>(null);
   // Excel-like grid state
@@ -2426,6 +2440,27 @@ function Step3Template({
 
       {/* AI Assist + Add Row Buttons */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* 월/분기 view toggle */}
+        <div className="flex items-center gap-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("month")}
+            className={`px-2 py-1 rounded ${
+              viewMode === "month"
+                ? "bg-pwc-orange text-white"
+                : "border border-pwc-gray-200 text-pwc-gray-600"
+            }`}
+          >월</button>
+          <button
+            type="button"
+            onClick={() => setViewMode("quarter")}
+            className={`px-2 py-1 rounded ${
+              viewMode === "quarter"
+                ? "bg-pwc-orange text-white"
+                : "border border-pwc-gray-200 text-pwc-gray-600"
+            }`}
+          >분기</button>
+        </div>
         <button
           onClick={handleAiSuggest}
           disabled={aiLoading || etControllable <= 0}
@@ -2596,7 +2631,7 @@ function Step3Template({
       {/* Excel-like Spreadsheet Grid */}
       <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm pb-24">
         <table ref={gridRef} className="w-full text-xs whitespace-nowrap border-collapse select-none" style={{ tableLayout: "fixed" }}>
-          <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 68 }} /><col style={{ width: 56 }} />{MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}<col style={{ width: 56 }} /></colgroup>
+          <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 68 }} /><col style={{ width: 56 }} />{viewMode === "month" ? MONTHS.map((m) => <col key={m} style={{ width: 52 }} />) : QUARTERS.map((q) => <col key={q.label} style={{ width: 72 }} />)}<col style={{ width: 56 }} /></colgroup>
           <thead className="bg-pwc-gray-50 sticky top-0 z-10">
             <tr className="border-b border-pwc-gray-200">
               <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">
@@ -2607,9 +2642,13 @@ function Step3Template({
               <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">담당자</th>
               <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">직급</th>
               <th className="px-2 py-2 text-right font-semibold text-pwc-gray-600">합계</th>
-              {MONTH_LABELS.map((label, i) => (
-                <th key={MONTHS[i]} className="px-1 py-2 text-right font-semibold text-pwc-gray-600">{label}</th>
-              ))}
+              {viewMode === "month"
+                ? MONTH_LABELS.map((label, i) => (
+                    <th key={MONTHS[i]} className="px-1 py-2 text-right font-semibold text-pwc-gray-600">{label}</th>
+                  ))
+                : QUARTERS.map((q) => (
+                    <th key={q.label} className="px-1 py-2 text-right font-semibold text-pwc-gray-600">{q.label}</th>
+                  ))}
               <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">
                 <span title="복제/삭제">...</span>
               </th>
@@ -2719,46 +2758,55 @@ function Step3Template({
                     {total > 0 ? total : ""}
                   </td>
                   {/* 월별 셀 */}
-                  {MONTHS.map((month, mi) => {
-                    const colIdx = MONTH_COL_START + mi;
-                    const isActive = activeCell?.row === currentVisualRow && activeCell?.col === colIdx;
-                    const isEditing = editingCell?.row === currentVisualRow && editingCell?.col === colIdx;
+                  {viewMode === "month"
+                    ? MONTHS.map((month, mi) => {
+                        const colIdx = MONTH_COL_START + mi;
+                        const isActive = activeCell?.row === currentVisualRow && activeCell?.col === colIdx;
+                        const isEditing = editingCell?.row === currentVisualRow && editingCell?.col === colIdx;
 
-                    return (
-                      <td
-                        key={month}
-                        data-row={currentVisualRow}
-                        data-col={colIdx}
-                        className={`px-0 py-0 text-right border-r border-pwc-gray-100 cursor-cell ${
-                          isActive
-                            ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
-                            : row.months[month]
-                            ? ""
-                            : ""
-                        }`}
-                        onClick={() => row.enabled && handleCellClick(currentVisualRow, colIdx)}
-                      >
-                        {isEditing && row.enabled ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={row.months[month] || ""}
-                            onChange={(e) => updateRowMonth(idx, month, Number(e.target.value) || 0)}
-                            onKeyDown={(e) => handleGridKeyDown(e, currentVisualRow, colIdx)}
-                            onBlur={() => { setEditingCell(null); }}
-                            className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
-                            min={0}
-                            max={300}
-                            step={0.25}
-                          />
-                        ) : (
-                          <div className="px-1 py-1 min-h-[24px] text-xs">
-                            {row.months[month] || ""}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
+                        return (
+                          <td
+                            key={month}
+                            data-row={currentVisualRow}
+                            data-col={colIdx}
+                            className={`px-0 py-0 text-right border-r border-pwc-gray-100 cursor-cell ${
+                              isActive
+                                ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
+                                : row.months[month]
+                                ? ""
+                                : ""
+                            }`}
+                            onClick={() => row.enabled && handleCellClick(currentVisualRow, colIdx)}
+                          >
+                            {isEditing && row.enabled ? (
+                              <input
+                                type="number"
+                                autoFocus
+                                value={row.months[month] || ""}
+                                onChange={(e) => updateRowMonth(idx, month, Number(e.target.value) || 0)}
+                                onKeyDown={(e) => handleGridKeyDown(e, currentVisualRow, colIdx)}
+                                onBlur={() => { setEditingCell(null); }}
+                                className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
+                                min={0}
+                                max={300}
+                                step={0.25}
+                              />
+                            ) : (
+                              <div className="px-1 py-1 min-h-[24px] text-xs">
+                                {row.months[month] || ""}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })
+                    : QUARTERS.map((q) => {
+                        const sum = q.months.reduce((s, m) => s + (row.months?.[m] ?? 0), 0);
+                        return (
+                          <td key={q.label} className="text-right text-xs text-pwc-gray-700 px-2 border-r border-pwc-gray-100">
+                            {sum > 0 ? sum.toLocaleString("ko-KR") : ""}
+                          </td>
+                        );
+                      })}
                   {/* Actions */}
                   <td className="px-1 py-0.5 text-center">
                     <div className="flex items-center justify-center gap-0.5">
@@ -2794,13 +2842,22 @@ function Step3Template({
               <td className="px-2 py-2 text-right">
                 {templateTotal.total > 0 ? templateTotal.total.toLocaleString() : ""}
               </td>
-              {MONTHS.map((month) => (
-                <td key={month} className="px-1 py-2 text-right">
-                  {templateTotal.monthTotals[month] > 0
-                    ? templateTotal.monthTotals[month]
-                    : ""}
-                </td>
-              ))}
+              {viewMode === "month"
+                ? MONTHS.map((month) => (
+                    <td key={month} className="px-1 py-2 text-right">
+                      {templateTotal.monthTotals[month] > 0
+                        ? templateTotal.monthTotals[month]
+                        : ""}
+                    </td>
+                  ))
+                : QUARTERS.map((q) => {
+                    const total = q.months.reduce((s, m) => s + (templateTotal.monthTotals[m] ?? 0), 0);
+                    return (
+                      <td key={q.label} className="px-1 py-2 text-right">
+                        {total > 0 ? total.toLocaleString("ko-KR") : ""}
+                      </td>
+                    );
+                  })}
               <td />
             </tr>
           </tbody>
