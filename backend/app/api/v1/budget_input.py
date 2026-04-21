@@ -568,6 +568,45 @@ def get_project_info(project_code: str, db: Session = Depends(get_db)):
 
 # ── Step 2: 구성원 관리 ─────────────────────────────
 
+# NOTE: export/upload routes must be registered BEFORE the plain
+# /members GET so that FastAPI does not swallow the sub-path as a
+# path-parameter match against {project_code}/members.
+
+@router.get("/projects/{project_code}/members/export")
+def export_project_members_early(
+    project_code: str,
+    user: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """Step 2 구성원 목록 Excel 다운로드."""
+    from openpyxl import Workbook
+
+    members = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_code == project_code)
+        .order_by(ProjectMember.sort_order, ProjectMember.id)
+        .all()
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "구성원"
+    ws.append(["empno", "name", "role", "grade"])
+    for m in members:
+        ws.append([m.empno or "", m.name or "", m.role or "FLDT", m.grade or ""])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="members_{project_code}.xlsx"',
+        },
+    )
+
+
 @router.get("/projects/{project_code}/members")
 def get_members(project_code: str, db: Session = Depends(get_db)):
     members = (
