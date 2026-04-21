@@ -26,6 +26,7 @@ def get_overview(
     department: Optional[str] = Query(None),
     project_code: Optional[str] = Query(None),
     budget_category: Optional[str] = Query(None),
+    service_type: Optional[str] = Query(None),
     cumulative: bool = Query(True),
     db: Session = Depends(get_db),
     user: Optional[dict] = Depends(get_optional_user),
@@ -44,6 +45,7 @@ def get_overview(
         department=department,
         project_code=project_code,
         budget_category=budget_category,
+        service_type=service_type,
         cumulative=cumulative,
         allowed_project_codes=allowed_codes,
     )
@@ -207,6 +209,15 @@ def get_filter_options(
         if p.department:
             depts_set.add(p.department)
 
+    # #50 service_type options — DB 실사용 값만 노출
+    from app.api.v1.budget_input import SERVICE_TYPES
+    name_by_code = {s["code"]: s["name"] for s in SERVICE_TYPES}
+    used_codes = sorted({p.service_type for p in all_projects if p.service_type})
+    service_types_list = [
+        {"code": c, "name": name_by_code.get(c, c)}
+        for c in used_codes
+    ]
+
     return {
         "projects": projects_list,
         "els": [
@@ -221,4 +232,5 @@ def get_filter_options(
             {"value": d, "label": d}
             for d in sorted(depts_set)
         ],
+        "service_types": service_types_list,
     }

@@ -117,7 +117,8 @@ def bulk_insert_budget_details(db: Session, project_code: str, details: list[dic
 def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                       department: str = None, project_code: str = None,
                       budget_category: str = None,
-                      cumulative: bool = True, allowed_project_codes: list = None):
+                      cumulative: bool = True, allowed_project_codes: list = None,
+                      service_type: str = None):
     """Overview 페이지 데이터 조회 (최적화)."""
     t_start = time.time()
 
@@ -133,6 +134,8 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
         prj_query = prj_query.filter(Project.department == department)
     if project_code:
         prj_query = prj_query.filter(Project.project_code == project_code)
+    if service_type:
+        prj_query = prj_query.filter(Project.service_type == service_type)
     projects = prj_query.all()
     project_codes = [p.project_code for p in projects]
 
