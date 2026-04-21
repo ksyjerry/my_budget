@@ -1338,7 +1338,7 @@ function Step1Form({
       {showProjectSearch && (
         <ProjectSearchModal
           clientCode={client.client_code}
-          onSelect={(p) => {
+          onSelect={async (p) => {
             setProject({
               ...project,
               project_code: p.project_code as string,
@@ -1368,7 +1368,32 @@ function Step1Form({
             });
             // 클라이언트 코드도 연동
             if (p.client_code) {
-              cField("client_code", p.client_code as string);
+              const code = p.client_code as string;
+              cField("client_code", code);
+              try {
+                const r = await fetch(
+                  `${API_BASE}/api/v1/budget/clients/${code}/info`,
+                  { credentials: "include" }
+                );
+                if (r.ok) {
+                  const info = await r.json();
+                  const base = client; // snapshot before async — existing user input wins
+                  setClient({
+                    ...base,
+                    industry: base.industry || info.industry || "",
+                    asset_size: base.asset_size || info.asset_size || "",
+                    listing_status: base.listing_status || info.listing_status || "",
+                    business_report: base.business_report || info.business_report || "",
+                    gaap: base.gaap || info.gaap || "",
+                    consolidated: base.consolidated || info.consolidated || "",
+                    subsidiary_count: base.subsidiary_count || info.subsidiary_count || "",
+                    internal_control: base.internal_control || info.internal_control || "",
+                    initial_audit: base.initial_audit || info.initial_audit || "",
+                  });
+                }
+              } catch {
+                /* silent fail — client info autofill is best-effort */
+              }
             }
           }}
           onClose={() => setShowProjectSearch(false)}
