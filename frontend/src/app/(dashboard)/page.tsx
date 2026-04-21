@@ -44,6 +44,8 @@ function OverviewInner() {
   const [viewMode, setViewMode] = useState("누적");
   // Project selection state (highlight bar chart, filter other views)
   const [selectedProjectCode, setSelectedProjectCode] = useState<string | null>(null);
+  // Category selection state (donut segment click → filter budget unit table)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -128,7 +130,9 @@ function OverviewInner() {
       });
   }, [rawStaffTime]);
 
-  const budgetUnits = rawBudgetUnits;
+  const budgetUnits = selectedCategory
+    ? rawBudgetUnits.filter((u: { category?: string }) => u.category === selectedCategory)
+    : rawBudgetUnits;
 
   // Handlers
   const handleProjectClick = (projectCode: string) => {
@@ -417,6 +421,9 @@ function OverviewInner() {
             <DonutChart
               data={categories.map((c) => ({ name: c.name, value: c.value }))}
               height={280}
+              onSegmentClick={(name) =>
+                setSelectedCategory((prev) => (prev === name ? null : name))
+              }
             />
           ) : (
             <EmptyState message={loading ? "로딩 중..." : "데이터가 없습니다."} />
@@ -425,9 +432,19 @@ function OverviewInner() {
 
         {/* Budget 관리단위별 Status */}
         <div className="section-card">
-          <h3 className="text-sm font-bold text-pwc-black uppercase tracking-wide mb-3">
-            Budget 관리단위별 Status
-          </h3>
+          <div className="flex items-center mb-3">
+            <h3 className="text-sm font-bold text-pwc-black uppercase tracking-wide">
+              Budget 관리단위별 Status
+            </h3>
+            {selectedCategory && (
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className="text-xs text-pwc-gray-600 hover:text-pwc-orange ml-2"
+              >
+                ✕ {selectedCategory} 필터 해제
+              </button>
+            )}
+          </div>
           <div className="overflow-auto border border-pwc-gray-100 rounded-lg" style={{ maxHeight: "350px" }}>
             <table className="w-full text-sm">
               <thead className="bg-pwc-gray-50 sticky top-0">
