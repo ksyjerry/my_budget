@@ -456,7 +456,10 @@ export default function BudgetWizardPage() {
 
   const saveStep3 = async (status: string) => {
     const rows = templateRows
-      .filter((r) => r.enabled)
+      .filter((r) => {
+        if (r.enabled) return true;
+        return Object.values(r.months ?? {}).some((h) => h && h > 0);
+      })
       .map((r) => ({
         budget_category: r.budget_category,
         budget_unit: r.budget_unit,
@@ -565,9 +568,12 @@ export default function BudgetWizardPage() {
       }
 
       // 3) Step 3: Time Budget
-      const enabledRows = templateRows.filter((r) => r.enabled);
-      if (enabledRows.length > 0) {
-        const tplRows = enabledRows.map((r) => ({
+      const rowsToSave = templateRows.filter((r) => {
+        if (r.enabled) return true;
+        return Object.values(r.months ?? {}).some((h) => h && h > 0);
+      });
+      if (rowsToSave.length > 0) {
+        const tplRows = rowsToSave.map((r) => ({
           budget_category: r.budget_category,
           budget_unit: r.budget_unit,
           empno: r.empno,
