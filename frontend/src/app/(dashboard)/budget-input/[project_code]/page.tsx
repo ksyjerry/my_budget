@@ -2033,7 +2033,10 @@ function Step3Template({
           client_info: clientInfo,
         }),
       });
-      if (!res.ok) throw new Error("AI 추천 실패");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: "AI 추천 실패" }));
+        throw new Error(errData.detail || "AI 추천 실패");
+      }
       const data = await res.json();
       setAiResult({ type: "suggest", data });
     } catch (e) {
@@ -2063,7 +2066,10 @@ function Step3Template({
           client_info: clientInfo,
         }),
       });
-      if (!res.ok) throw new Error("AI 검증 실패");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: "AI 검증 실패" }));
+        throw new Error(errData.detail || "AI 검증 실패");
+      }
       const data = await res.json();
       setAiResult({ type: "validate", data });
     } catch (e) {
