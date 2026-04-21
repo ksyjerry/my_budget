@@ -19,22 +19,38 @@ import {
 } from "@/lib/budget-constants";
 
 // ── NumberField (외부 정의 — re-render 시 focus 유지) ──
-function NumberField({
-  label,
-  value,
-  onChange,
-  readOnly,
-  contractHours,
-}: {
+interface NumberFieldProps {
   label: string;
-  value: number;
+  value?: number;
   onChange?: (v: number) => void;
   readOnly?: boolean;
+  step?: number;
+  min?: number;
+  allowNegative?: boolean;
   contractHours?: number;
-}) {
+}
+
+function NumberField(props: NumberFieldProps) {
+  const {
+    label,
+    value,
+    onChange,
+    readOnly,
+    step = 1,
+    min,
+    allowNegative = false,
+    contractHours,
+  } = props;
+
   const pct = contractHours && contractHours > 0 && value
     ? `${Math.round(value / contractHours * 100)}%`
     : null;
+
+  const display =
+    readOnly && typeof value === "number"
+      ? value.toLocaleString("ko-KR")
+      : value ?? "";
+
   return (
     <div>
       <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
@@ -42,10 +58,18 @@ function NumberField({
         {pct && <span className="ml-1 text-pwc-orange">({pct})</span>}
       </label>
       <input
-        type="number"
-        value={value || ""}
-        onChange={(e) => onChange?.(Number(e.target.value) || 0)}
+        type={readOnly ? "text" : "number"}
+        value={display}
+        step={step}
+        min={min}
         readOnly={readOnly}
+        onChange={(e) => {
+          let v = parseFloat(e.target.value);
+          if (Number.isNaN(v)) v = 0;
+          if (!allowNegative && v < 0) v = 0;
+          if (typeof min === "number" && v < min) v = min;
+          onChange?.(v);
+        }}
         className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
           readOnly
             ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
@@ -1479,66 +1503,77 @@ function Step1Form({
             label="총 계약시간"
             value={project.contract_hours}
             onChange={(v) => pField("contract_hours", v)}
+            min={0}
           />
           <NumberField
             label="AX/DX 시간"
             value={project.axdx_hours}
             onChange={(v) => pField("axdx_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="QRP 시간"
             value={project.qrp_hours}
             onChange={(v) => pField("qrp_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="RM/CRS/M&T 시간"
             value={project.rm_hours}
             onChange={(v) => pField("rm_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="FLDT-EL 시간"
             value={project.el_hours}
             onChange={(v) => pField("el_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="FLDT-PM 시간"
             value={project.pm_hours}
             onChange={(v) => pField("pm_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="RA-EL/PM 시간"
             value={project.ra_elpm_hours}
             onChange={(v) => pField("ra_elpm_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="Fulcrum 시간"
             value={project.fulcrum_hours}
             onChange={(v) => pField("fulcrum_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="RA-Staff 시간"
             value={project.ra_staff_hours}
             onChange={(v) => pField("ra_staff_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="Specialist 시간"
             value={project.specialist_hours}
             onChange={(v) => pField("specialist_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="출장 시간"
             value={project.travel_hours}
             onChange={(v) => pField("travel_hours", v)}
             contractHours={project.contract_hours}
+            min={0}
           />
           <NumberField
             label="ET Controllable Budget"
