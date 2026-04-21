@@ -4,39 +4,42 @@ const API = "http://localhost:3001/api/v1";
 const EL = process.env.EL_EMPNO || "170661";
 
 test.describe("S2 — Overview filters (API)", () => {
-  test("filter-options returns projects array with value/label shape", async ({ request }) => {
+  test("filter-options returns service_types with value/label shape", async ({ request }) => {
     await request.post(`${API}/auth/login`, { data: { empno: EL } });
     const r = await request.get(`${API}/filter-options`);
     expect(r.status()).toBe(200);
     const body = await r.json();
-    // filter-options exposes: projects, els, pms, departments
-    expect(Array.isArray(body.projects)).toBe(true);
-    if (body.projects.length > 0) {
-      expect(body.projects[0]).toHaveProperty("value");
-      expect(body.projects[0]).toHaveProperty("label");
+    expect(Array.isArray(body.service_types)).toBe(true);
+    if (body.service_types.length > 0) {
+      expect(body.service_types[0]).toHaveProperty("value");
+      expect(body.service_types[0]).toHaveProperty("label");
     }
   });
 
-  test("filter-options returns els and pms arrays", async ({ request }) => {
+  test("filter-options excludes unused service_type codes like TAX", async ({ request }) => {
     await request.post(`${API}/auth/login`, { data: { empno: EL } });
     const r = await request.get(`${API}/filter-options`);
     expect(r.status()).toBe(200);
     const body = await r.json();
-    expect(Array.isArray(body.els)).toBe(true);
-    expect(Array.isArray(body.pms)).toBe(true);
-    if (body.els.length > 0) {
-      expect(body.els[0]).toHaveProperty("value");
-      expect(body.els[0]).toHaveProperty("label");
-    }
+    const values = new Set(
+      (body.service_types || []).map((s: { value: string }) => s.value),
+    );
+    expect(values.has("TAX")).toBe(false);
   });
 
-  test("overview respects el_empno filter — returns 200", async ({ request }) => {
+  test("overview respects service_type=AUDIT filter", async ({ request }) => {
     await request.post(`${API}/auth/login`, { data: { empno: EL } });
-    const r = await request.get(`${API}/overview?el_empno=${EL}`);
+    const r = await request.get(`${API}/overview?service_type=AUDIT`);
     expect(r.status()).toBe(200);
   });
 
-  test("overview without filters returns all projects in scope", async ({ request }) => {
+  test("overview respects service_type=ESG filter", async ({ request }) => {
+    await request.post(`${API}/auth/login`, { data: { empno: EL } });
+    const r = await request.get(`${API}/overview?service_type=ESG`);
+    expect(r.status()).toBe(200);
+  });
+
+  test("overview without service_type returns scope with kpi+projects", async ({ request }) => {
     await request.post(`${API}/auth/login`, { data: { empno: EL } });
     const r = await request.get(`${API}/overview`);
     expect(r.status()).toBe(200);
@@ -45,16 +48,13 @@ test.describe("S2 — Overview filters (API)", () => {
     expect(body).toHaveProperty("kpi");
   });
 
-  test("overview with nonexistent el_empno returns empty or default shape", async ({ request }) => {
+  test("overview with unused service_type returns empty projects list", async ({ request }) => {
     await request.post(`${API}/auth/login`, { data: { empno: EL } });
-    const r = await request.get(`${API}/overview?el_empno=NONEXISTENT_99999`);
+    const r = await request.get(`${API}/overview?service_type=NONEXISTENT_CODE_XYZ`);
     expect(r.status()).toBe(200);
-    // el_empno 필터가 적용되면 projects 배열이 비어있거나 전체 구조 반환
     const body = await r.json();
-    expect(body).toHaveProperty("projects");
     if (Array.isArray(body.projects)) {
-      // projects may be empty or full depending on backend filter implementation
-      expect(body.projects.length).toBeGreaterThanOrEqual(0);
+      expect(body.projects.length).toBe(0);
     }
   });
 });
