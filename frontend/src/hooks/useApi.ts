@@ -53,6 +53,7 @@ export function useFilterOptions() {
     els: { value: string; label: string }[];
     pms: { value: string; label: string }[];
     departments: { value: string; label: string }[];
+    service_types?: { value: string; label: string }[];
   }>("/api/v1/filter-options");
 }
 

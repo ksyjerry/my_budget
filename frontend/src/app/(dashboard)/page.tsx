@@ -52,6 +52,7 @@ function OverviewInner() {
     department: "",
     project_code: "",
     year_month: "",
+    service_type: "",
   });
 
   // Full (unfiltered) API call — always fetches all data
@@ -188,6 +189,12 @@ function OverviewInner() {
             options: filterOpts?.departments || [],
             value: filters.department,
             onChange: (v: string) => setFilters((f) => ({ ...f, department: v })),
+          },
+          {
+            name: "service_type", label: "대분류",
+            options: filterOpts?.service_types || [],
+            value: filters.service_type,
+            onChange: (v: string) => setFilters((f) => ({ ...f, service_type: v })),
           },
         ]}
       />
