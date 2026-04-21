@@ -26,6 +26,7 @@ interface NumberFieldProps {
   readOnly?: boolean;
   step?: number;
   min?: number;
+  max?: number;
   allowNegative?: boolean;
   contractHours?: number;
 }
@@ -38,6 +39,7 @@ function NumberField(props: NumberFieldProps) {
     readOnly,
     step = 1,
     min,
+    max,
     allowNegative = false,
     contractHours,
   } = props;
@@ -62,12 +64,14 @@ function NumberField(props: NumberFieldProps) {
         value={display}
         step={step}
         min={min}
+        max={max}
         readOnly={readOnly}
         onChange={(e) => {
           let v = parseFloat(e.target.value);
           if (Number.isNaN(v)) v = 0;
           if (!allowNegative && v < 0) v = 0;
           if (typeof min === "number" && v < min) v = min;
+          if (typeof max === "number" && v > max) v = max;
           onChange?.(v);
         }}
         className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
@@ -2682,7 +2686,8 @@ function Step3Template({
                             onBlur={() => { setEditingCell(null); }}
                             className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
                             min={0}
-                            step={0.5}
+                            max={300}
+                            step={0.25}
                           />
                         ) : (
                           <div className="px-1 py-1 min-h-[24px] text-xs">
