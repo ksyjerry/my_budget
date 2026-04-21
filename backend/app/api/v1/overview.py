@@ -214,7 +214,7 @@ def get_filter_options(
     name_by_code = {s["code"]: s["name"] for s in SERVICE_TYPES}
     used_codes = sorted({p.service_type for p in all_projects if p.service_type})
     service_types_list = [
-        {"code": c, "name": name_by_code.get(c, c)}
+        {"value": c, "label": name_by_code.get(c, c)}
         for c in used_codes
     ]
 

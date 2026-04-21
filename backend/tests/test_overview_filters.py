@@ -35,18 +35,18 @@ def test_filter_options_returns_service_types(client, elpm_cookie):
     assert r.status_code == 200
     body = r.json()
     assert "service_types" in body
-    codes = {s["code"] for s in body["service_types"]}
-    assert "AUDIT" in codes
-    by_code = {s["code"]: s["name"] for s in body["service_types"]}
-    assert by_code["AUDIT"] == "감사"
+    values = {s["value"] for s in body["service_types"]}
+    assert "AUDIT" in values
+    by_value = {s["value"]: s["label"] for s in body["service_types"]}
+    assert by_value["AUDIT"] == "감사"
 
 
 def test_filter_options_excludes_unused_codes(client, admin_cookie):
     r = client.get("/api/v1/filter-options", cookies=admin_cookie)
     assert r.status_code == 200
-    codes = {s["code"] for s in r.json()["service_types"]}
+    values = {s["value"] for s in r.json()["service_types"]}
     # TAX 는 SERVICE_TYPES 에도 없음 + 따라서 옵션에도 없어야 함
-    assert "TAX" not in codes
+    assert "TAX" not in values
 
 
 def test_overview_filters_by_service_type_esg(client, admin_cookie):
