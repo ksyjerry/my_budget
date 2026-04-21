@@ -14,8 +14,8 @@ test.describe("S3 — AI endpoint error shape (#18 #42)", () => {
         members: [{ empno: EL, name: "최성우", grade: "EL" }],
       },
     });
-    // config 미설정 시 500/503, 설정 있지만 호출 실패 시 502, 성공 시 200
-    expect([200, 500, 502, 503]).toContain(r.status());
+    // config 미설정 시 503 (S3-T1 fix), 호출 실패 시 502, 성공 시 200
+    expect([200, 502, 503]).toContain(r.status());
     if (r.status() !== 200) {
       const body = await r.json();
       expect(body).toHaveProperty("detail");
@@ -33,7 +33,7 @@ test.describe("S3 — AI endpoint error shape (#18 #42)", () => {
         rows: [],
       },
     });
-    expect([200, 500, 502, 503]).toContain(r.status());
+    expect([200, 502, 503]).toContain(r.status());
     if (r.status() !== 200) {
       const body = await r.json();
       expect(body).toHaveProperty("detail");
