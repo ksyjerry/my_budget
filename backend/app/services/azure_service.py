@@ -397,6 +397,18 @@ def get_overview_actuals(
     }
 
 
+def get_project_empnos(project_codes: list[str]) -> list[str]:
+    """Return distinct empnos that appear in TMS rows for the given project_codes.
+
+    Used by budget_service to ensure STAFF TIME aggregation captures
+    individuals who worked on the project even without a budget assignment.
+    """
+    if not project_codes:
+        return []
+    rows = _fetch_tms_rows(project_codes)
+    return sorted({r["empno"] for r in rows if r.get("empno")})
+
+
 # ── Public 집계 함수 (개별 페이지용) ─────────────
 
 def get_actual_by_project(project_codes: list[str]) -> dict[str, float]:

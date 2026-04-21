@@ -243,7 +243,12 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                 })
 
     role_empnos = list({rm["empno"] for rm in role_mappings if rm["empno"]}) or None
-    staff_empnos = list(staff_budget.keys()) if staff_budget else None
+
+    # #25: Budget 없는 staff 의 TMS 시간도 포함 — TMS 에서 본 empno ∪ budget empno, role 제외
+    budgeted_empnos = set(staff_budget.keys()) if staff_budget else set()
+    tms_empnos = set(azure_service.get_project_empnos(project_codes))
+    role_set_for_exclusion = set(role_empnos or [])
+    staff_empnos = sorted((budgeted_empnos | tms_empnos) - role_set_for_exclusion) or None
 
     # ④ Azure: 단일 패스로 모든 actual 집계
     actuals = azure_service.get_overview_actuals(

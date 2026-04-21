@@ -47,3 +47,25 @@ def test_total_actual_matches_sum_of_by_project(tms_fixture, db):
         )
     total_from_by_project = sum(result["by_project"].values())
     assert total_from_by_project == 15.0
+
+
+def test_get_project_empnos_returns_distinct_tms_empnos(db):
+    """#25 — get_project_empnos helper returns distinct empnos from TMS rows."""
+    from app.services import azure_service
+    from unittest.mock import patch
+    fixture = [
+        {"project_code": "P1", "empno": "E1", "use_time": 10.0,
+         "activity_code_1": "", "activity_code_2": "", "activity_code_3": ""},
+        {"project_code": "P1", "empno": "E3", "use_time": 7.0,
+         "activity_code_1": "", "activity_code_2": "", "activity_code_3": ""},
+        {"project_code": "P1", "empno": "E1", "use_time": 3.0,
+         "activity_code_1": "", "activity_code_2": "", "activity_code_3": ""},
+    ]
+    with patch.object(azure_service, "_fetch_tms_rows", return_value=fixture):
+        empnos = azure_service.get_project_empnos(["P1"])
+    assert set(empnos) == {"E1", "E3"}
+
+
+def test_get_project_empnos_empty_input():
+    from app.services import azure_service
+    assert azure_service.get_project_empnos([]) == []
