@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import { useFilterOptions } from "@/hooks/useApi";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -67,23 +67,26 @@ function DownloadIcon() {
   );
 }
 
-function DownloadButton({ item }: { item: DownloadItem }) {
+function DownloadButton({ item, selectedProjectCode }: { item: DownloadItem; selectedProjectCode: string }) {
   const [loading, setLoading] = useState(false);
 
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/export/${item.endpoint}`, { credentials: "include" });
+      const url =
+        `${API_BASE}/api/v1/export/${item.endpoint}` +
+        (selectedProjectCode ? `?project_code=${selectedProjectCode}` : "");
+      const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objectUrl;
       a.download = `${item.filename}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
     } catch {
       alert("다운로드에 실패했습니다. 다시 시도해 주세요.");
     } finally {
@@ -110,11 +113,28 @@ function DownloadButton({ item }: { item: DownloadItem }) {
 }
 
 export default function AppendixPage() {
+  const { data: filterOpts } = useFilterOptions();
+  const [selectedProjectCode, setSelectedProjectCode] = useState("");
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h2 className="text-lg font-bold text-pwc-black">Excel Quick Download</h2>
-        <p className="text-sm text-pwc-gray-600 mt-1">각 View의 데이터를 CSV 파일로 다운로드할 수 있습니다.</p>
+        <p className="text-sm text-pwc-gray-600 mt-1">각 View의 데이터를 XLSX 파일로 다운로드할 수 있습니다.</p>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <label className="text-xs font-medium text-pwc-gray-600">프로젝트:</label>
+        <select
+          value={selectedProjectCode}
+          onChange={(e) => setSelectedProjectCode(e.target.value)}
+          className="border border-pwc-gray-200 rounded-md px-3 py-1.5 text-sm bg-white"
+        >
+          <option value="">(전체)</option>
+          {(filterOpts?.projects || []).map((p: { value: string; label: string }) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -128,7 +148,7 @@ export default function AppendixPage() {
             </div>
             <div className="space-y-2">
               {section.items.map((item) => (
-                <DownloadButton key={item.endpoint} item={item} />
+                <DownloadButton key={item.endpoint} item={item} selectedProjectCode={selectedProjectCode} />
               ))}
             </div>
           </div>
