@@ -20,12 +20,19 @@ function yraColor(yra: number): string {
 
 // --- Inner component that uses cross-filter ---
 
+const GRADE_ORDER: Record<string, number> = {
+  P: 0, MD: 1, D: 2, SM: 3, M: 4, SA: 5, A: 6, AA: 7,
+};
+
 function SummaryContent() {
   const [filters, setFilters] = useState({
     el_empno: "",
     pm_empno: "",
     department: "",
   });
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "grade" | "budget" | "actual">("name");
 
   const { toggleFilter, clearAll, isSelected, hasActiveFilter, getActiveFilters } = useCrossFilter();
 
@@ -72,14 +79,34 @@ function SummaryContent() {
   const groupTotalYra = groupTotals.budget > 0 ? (groupTotals.actual / groupTotals.budget) * 100 : 0;
   const groupTotalRatio = groupTotals.contract > 0 ? (groupTotals.axdx / groupTotals.contract) * 100 : 0;
 
+  // Search + sort applied on top of cross-filtered projects
+  const filteredSortedProjects = useMemo(() => {
+    let arr = [...filteredProjects];
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      arr = arr.filter((s) =>
+        ((s.project_name || "") + "").toLowerCase().includes(q) ||
+        ((s.project_code || "") + "").toLowerCase().includes(q)
+      );
+    }
+    arr.sort((a, b) => {
+      if (sortBy === "name") return ((a.project_name || "") + "").localeCompare(((b.project_name || "") + ""), "ko");
+      if (sortBy === "grade") return (GRADE_ORDER[(a as any).grade] ?? 99) - (GRADE_ORDER[(b as any).grade] ?? 99);
+      if (sortBy === "budget") return (b.total_budget ?? 0) - (a.total_budget ?? 0);
+      if (sortBy === "actual") return (b.total_actual ?? 0) - (a.total_actual ?? 0);
+      return 0;
+    });
+    return arr;
+  }, [filteredProjects, searchQuery, sortBy]);
+
   const projectTotals = useMemo(() => {
     return {
-      contract: filteredProjects.reduce((s, r) => s + r.contract_hours, 0),
-      budget: filteredProjects.reduce((s, r) => s + r.total_budget, 0),
-      actual: filteredProjects.reduce((s, r) => s + r.total_actual, 0),
-      axdx: filteredProjects.reduce((s, r) => s + r.axdx, 0),
+      contract: filteredSortedProjects.reduce((s, r) => s + r.contract_hours, 0),
+      budget: filteredSortedProjects.reduce((s, r) => s + r.total_budget, 0),
+      actual: filteredSortedProjects.reduce((s, r) => s + r.total_actual, 0),
+      axdx: filteredSortedProjects.reduce((s, r) => s + r.axdx, 0),
     };
-  }, [filteredProjects]);
+  }, [filteredSortedProjects]);
 
   const projectTotalYra = projectTotals.budget > 0 ? (projectTotals.actual / projectTotals.budget) * 100 : 0;
   const projectTotalRatio = projectTotals.contract > 0 ? (projectTotals.axdx / projectTotals.contract) * 100 : 0;
@@ -210,6 +237,25 @@ function SummaryContent() {
             {/* Project summary table */}
             <div className="section-card">
               <h3 className="text-sm font-bold text-pwc-black uppercase tracking-wide mb-3">Project Summary</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="프로젝트명/코드 검색"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border border-pwc-gray-200 rounded-md px-3 py-1.5 text-sm bg-white w-44"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "name" | "grade" | "budget" | "actual")}
+                  className="border border-pwc-gray-200 rounded-md px-3 py-1.5 text-sm bg-white"
+                >
+                  <option value="name">이름순</option>
+                  <option value="grade">직급순</option>
+                  <option value="budget">Budget 큰 순</option>
+                  <option value="actual">Actual 큰 순</option>
+                </select>
+              </div>
               <div className="overflow-auto border border-pwc-gray-100 rounded-lg" style={{ maxHeight: "320px" }}>
                 <table className="w-full text-sm">
                   <thead className="bg-pwc-gray-50 sticky top-0">
@@ -224,10 +270,10 @@ function SummaryContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProjects.length === 0 && !loading && (
+                    {filteredSortedProjects.length === 0 && !loading && (
                       <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-pwc-gray-600">데이터가 없습니다.</td></tr>
                     )}
-                    {filteredProjects.map((row, idx) => (
+                    {filteredSortedProjects.map((row, idx) => (
                       <tr key={row.project_code || idx} className="border-t border-pwc-gray-100 hover:bg-pwc-gray-50">
                         <td className="px-3 py-1.5 text-xs whitespace-nowrap max-w-[220px] truncate" title={row.project_name}>
                           {row.project_name}
@@ -242,7 +288,7 @@ function SummaryContent() {
                         <td className="px-3 py-1.5 text-xs text-right">{Math.round(row.axdx_ratio)}%</td>
                       </tr>
                     ))}
-                    {filteredProjects.length > 0 && (
+                    {filteredSortedProjects.length > 0 && (
                       <tr className="border-t-2 border-pwc-black bg-pwc-gray-50 font-semibold text-sm">
                         <td className="px-3 py-2">합계</td>
                         <td className="px-3 py-2 text-right">{fmt(projectTotals.contract)}</td>
