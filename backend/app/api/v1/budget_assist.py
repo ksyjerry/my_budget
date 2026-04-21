@@ -136,13 +136,14 @@ def _get_reference_data(db: Session, project_code: str, client_info: dict) -> di
 
 def _get_client():
     from app.services.llm_client import GenAIClient
-    from dotenv import load_dotenv
-    load_dotenv()
     base_url = os.getenv("GENAI_BASE_URL", "")
     api_key = os.getenv("PwC_LLM_API_KEY", "")
     model = os.getenv("PwC_LLM_MODEL", "bedrock.anthropic.claude-sonnet-4-6")
     if not base_url or not api_key:
-        raise HTTPException(status_code=500, detail="GenAI Gateway 설정이 없습니다.")
+        raise HTTPException(
+            status_code=503,
+            detail="AI 서비스가 현재 구성되지 않았습니다. 관리자에게 문의해주세요. (PwC_LLM_API_KEY 또는 GENAI_BASE_URL 미설정)",
+        )
     return GenAIClient(base_url=base_url, api_key=api_key, model=model)
 
 
@@ -221,9 +222,14 @@ async def suggest_budget(
             temperature=0.2,
             max_tokens=8192,
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Budget suggest LLM error: {e}")
-        raise HTTPException(status_code=502, detail="AI 추천 생성에 실패했습니다.")
+        logger.error(f"Budget suggest LLM error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI 추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+        )
 
     elapsed = int((time.time() - t0) * 1000)
     logger.info(f"Budget suggest completed: {elapsed}ms")
@@ -315,9 +321,14 @@ async def validate_budget(
             temperature=0.2,
             max_tokens=4096,
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Budget validate LLM error: {e}")
-        raise HTTPException(status_code=502, detail="AI 검증에 실패했습니다.")
+        logger.error(f"Budget validate LLM error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI 검증에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+        )
 
     elapsed = int((time.time() - t0) * 1000)
     logger.info(f"Budget validate completed: {elapsed}ms")
