@@ -147,27 +147,32 @@ def get_client_info(
 
 
 @router.get("/employees/search")
-def search_employees(q: str = "", db: Session = Depends(get_db)):
-    """직원 이름/사번으로 검색 — Postgres employees 마스터 단일 조회."""
+def search_employees(
+    q: str = "",
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+):
+    """직원 이름/사번으로 검색 — Postgres employees 마스터 단일 조회.
+
+    기본값으로 재직 직원만 반환. include_inactive=true 시 퇴사/휴직 포함.
+    """
     if not q or len(q) < 2:
         return []
     from app.models.employee import Employee
-    rows = (
-        db.query(Employee)
-        .filter(
-            (Employee.name.ilike(f"%{q}%")) |
-            (Employee.empno.ilike(f"%{q}%"))
-        )
-        .order_by(Employee.name)
-        .limit(30)
-        .all()
+    query = db.query(Employee).filter(
+        (Employee.name.ilike(f"%{q}%")) |
+        (Employee.empno.ilike(f"%{q}%"))
     )
+    if not include_inactive:
+        query = query.filter(Employee.emp_status == "재직")
+    rows = query.order_by(Employee.name).limit(30).all()
     return [
         {
             "empno": e.empno,
             "name": e.name,
             "grade": e.grade_name or "",
             "department": e.department or "",
+            "emp_status": e.emp_status or "",
         }
         for e in rows
     ]
