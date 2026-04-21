@@ -660,6 +660,143 @@ def save_members(
 
 # ── Step 3: Budget Template ──────────────────────────
 
+# Note: export/upload registered before plain /template so FastAPI does not
+# swallow `template/export` as a {project_code} sub-path match.
+
+@router.get("/projects/{project_code}/template/export")
+def export_project_template(
+    project_code: str,
+    user: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """Step 3 Time Budget Excel 다운로드."""
+    from openpyxl import Workbook
+    from app.models.budget import BudgetDetail
+
+    rows = (
+        db.query(BudgetDetail)
+        .filter(BudgetDetail.project_code == project_code)
+        .order_by(
+            BudgetDetail.budget_category,
+            BudgetDetail.budget_unit,
+            BudgetDetail.empno,
+            BudgetDetail.year_month,
+        )
+        .all()
+    )
+
+    months: list[str] = sorted({r.year_month for r in rows if r.year_month})
+    pivot: dict[tuple, dict] = {}
+    name_by_empno: dict[str, str] = {}
+    grade_by_empno: dict[str, str] = {}
+    for r in rows:
+        key = (r.budget_category or "", r.budget_unit or "", r.empno or "")
+        pivot.setdefault(key, {})
+        pivot[key][r.year_month] = (pivot[key].get(r.year_month) or 0) + (r.budget_hours or 0)
+        if r.emp_name:
+            name_by_empno[r.empno or ""] = r.emp_name
+        if r.grade:
+            grade_by_empno[r.empno or ""] = r.grade
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Time Budget"
+    headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
+    ws.append(headers)
+    for (cat, unit, emp), month_hours in pivot.items():
+        row_data = [cat, unit, emp, name_by_empno.get(emp, ""), grade_by_empno.get(emp, "")]
+        for m in months:
+            row_data.append(month_hours.get(m, 0))
+        ws.append(row_data)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="template_{project_code}.xlsx"'},
+    )
+
+
+@router.post("/projects/{project_code}/template/upload")
+async def upload_project_template(
+    project_code: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
+    """Step 3 Time Budget Excel 업로드 — 기존 budget_details truncate+insert."""
+    from openpyxl import load_workbook
+    from app.models.budget import BudgetDetail
+    from app.api.deps import assert_can_modify_project
+    from fastapi import HTTPException
+
+    assert_can_modify_project(db, user, project_code)
+
+    content = await file.read()
+    wb = load_workbook(io.BytesIO(content), data_only=True)
+    ws = wb.active
+
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return {"imported_count": 0, "skipped": [{"reason": "empty"}]}
+
+    headers = [str(h) if h is not None else "" for h in rows[0]]
+    base_cols = {"budget_category": -1, "budget_unit": -1, "empno": -1, "name": -1, "grade": -1}
+    month_cols: list[tuple[int, str]] = []
+    for idx, h in enumerate(headers):
+        h_clean = h.strip()
+        if h_clean in base_cols:
+            base_cols[h_clean] = idx
+        elif "-" in h_clean and len(h_clean) >= 7:
+            month_cols.append((idx, h_clean))
+
+    if base_cols["budget_unit"] == -1:
+        raise HTTPException(status_code=400, detail="헤더에 budget_unit 컬럼이 필요합니다.")
+
+    db.query(BudgetDetail).filter(BudgetDetail.project_code == project_code).delete(
+        synchronize_session=False
+    )
+    db.commit()
+
+    imported = 0
+    skipped: list[dict] = []
+    for ridx, row in enumerate(rows[1:], start=2):
+        if not row or not any(c is not None for c in row):
+            continue
+        cat = str(row[base_cols["budget_category"]]).strip() if base_cols["budget_category"] >= 0 and row[base_cols["budget_category"]] else ""
+        unit = str(row[base_cols["budget_unit"]]).strip() if row[base_cols["budget_unit"]] else ""
+        empno = str(row[base_cols["empno"]]).strip() if base_cols["empno"] >= 0 and row[base_cols["empno"]] else ""
+        name = str(row[base_cols["name"]]).strip() if base_cols["name"] >= 0 and row[base_cols["name"]] else ""
+        grade = str(row[base_cols["grade"]]).strip() if base_cols["grade"] >= 0 and row[base_cols["grade"]] else ""
+        if not unit:
+            skipped.append({"row": ridx, "reason": "budget_unit missing"})
+            continue
+        for col_idx, year_month in month_cols:
+            cell = row[col_idx] if col_idx < len(row) else None
+            try:
+                hours = float(cell or 0)
+            except (TypeError, ValueError):
+                hours = 0
+            if hours == 0:
+                continue
+            db.add(BudgetDetail(
+                project_code=project_code,
+                budget_category=cat,
+                budget_unit=unit,
+                empno=empno,
+                emp_name=name,
+                grade=grade,
+                year_month=year_month,
+                budget_hours=hours,
+            ))
+            imported += 1
+
+    db.commit()
+    return {"imported_count": imported, "skipped": skipped}
+
+
 @router.get("/projects/{project_code}/template")
 def get_template(project_code: str, db: Session = Depends(get_db)):
     """Budget Template 조회."""
