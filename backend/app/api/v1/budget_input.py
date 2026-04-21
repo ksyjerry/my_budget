@@ -549,6 +549,7 @@ def get_project_info(project_code: str, db: Session = Depends(get_db)):
             "total_budget_hours": project.total_budget_hours,
             "template_status": project.template_status,
             "service_type": project.service_type or "AUDIT",
+            "fiscal_start": project.fiscal_start.isoformat() if project.fiscal_start else None,
         },
         "client": {
             "client_code": client.client_code if client else "",

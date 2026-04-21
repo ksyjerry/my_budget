@@ -59,3 +59,26 @@ export const CATEGORY_ORDER: Record<string, number> = {
 export function getCategoryOrder(category: string): number {
   return CATEGORY_ORDER[category] ?? 50;
 }
+
+export function generateMonths(fiscalStartIso: string | null | undefined): string[] {
+  let startMonth = 4;
+  let startYear = new Date().getFullYear();
+  if (fiscalStartIso) {
+    const d = new Date(fiscalStartIso);
+    if (!isNaN(d.getTime())) {
+      startMonth = d.getMonth() + 1;
+      startYear = d.getFullYear();
+    }
+  }
+  const months: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    const m = ((startMonth - 1 + i) % 12) + 1;
+    const y = startYear + Math.floor((startMonth - 1 + i) / 12);
+    months.push(`${y}-${String(m).padStart(2, "0")}`);
+  }
+  return months;
+}
+
+export function generateMonthLabels(months: string[]): string[] {
+  return months.map((m) => `${parseInt(m.slice(5), 10)}월`);
+}

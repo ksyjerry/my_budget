@@ -14,8 +14,10 @@ import {
   SUBSIDIARY_OPTIONS,
   INTERNAL_CONTROL_OPTIONS,
   AUDIT_TYPE_OPTIONS,
-  MONTHS,
-  MONTH_LABELS,
+  MONTHS as DEFAULT_MONTHS,
+  MONTH_LABELS as DEFAULT_MONTH_LABELS,
+  generateMonths,
+  generateMonthLabels,
 } from "@/lib/budget-constants";
 
 // ── NumberField (외부 정의 — re-render 시 focus 유지) ──
@@ -110,6 +112,7 @@ interface ProjectInfo {
   total_budget_hours: number;
   template_status: string;
   service_type: string;
+  fiscal_start?: string | null;
 }
 
 interface ClientInfo {
@@ -372,6 +375,13 @@ export default function BudgetWizardPage() {
     project.travel_hours,
   ]);
 
+  // ── Dynamic MONTHS based on fiscal_start ─────────
+  const MONTHS = useMemo(
+    () => (project.fiscal_start ? generateMonths(project.fiscal_start) : DEFAULT_MONTHS),
+    [project.fiscal_start]
+  );
+  const MONTH_LABELS = useMemo(() => generateMonthLabels(MONTHS), [MONTHS]);
+
   // ── Template totals ──────────────────────────────
   const templateTotal = useMemo(() => {
     let total = 0;
@@ -387,7 +397,7 @@ export default function BudgetWizardPage() {
       });
     });
     return { total, monthTotals };
-  }, [templateRows]);
+  }, [templateRows, MONTHS]);
 
   // ── Save handlers ────────────────────────────────
   const saveStep1 = async () => {
@@ -835,6 +845,21 @@ export default function BudgetWizardPage() {
             budgetUnits={budgetUnits}
             projectCode={project.project_code}
             clientInfo={client}
+            months={MONTHS}
+            monthLabels={MONTH_LABELS}
+            onTemplateImported={async () => {
+              const code = project.project_code || projectCode;
+              if (!code || code === "new") return;
+              const r = await fetch(`${API_BASE}/api/v1/budget/projects/${code}/template`);
+              if (r.ok) {
+                const data = await r.json();
+                if (data?.rows?.length) {
+                  setTemplateRows(
+                    data.rows.map((row: TemplateRow) => ({ ...row, enabled: true }))
+                  );
+                }
+              }
+            }}
           />
         )}
       </div>
@@ -2130,6 +2155,9 @@ function Step3Template({
   budgetUnits,
   projectCode,
   clientInfo,
+  months: MONTHS,
+  monthLabels: MONTH_LABELS,
+  onTemplateImported,
 }: {
   rows: TemplateRow[];
   setRows: (rows: TemplateRow[]) => void;
@@ -2144,6 +2172,9 @@ function Step3Template({
   budgetUnits: BudgetUnit[];
   projectCode: string;
   clientInfo: ClientInfo;
+  months: string[];
+  monthLabels: string[];
+  onTemplateImported?: () => Promise<void>;
 }) {
   const [viewMode, setViewMode] = useState<"month" | "quarter">("month");
   const QUARTERS = useMemo(() => {
@@ -2403,6 +2434,57 @@ function Step3Template({
     });
   };
 
+  async function handleExportTemplate() {
+    const res = await fetch(
+      `${API_BASE}/api/v1/budget/projects/${projectCode}/template/export`,
+      { credentials: "include" }
+    );
+    if (!res.ok) {
+      alert("다운로드 실패");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `template_${projectCode}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportTemplate(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm("기존 Time Budget 데이터가 모두 교체됩니다. 계속하시겠습니까?")) {
+      e.target.value = "";
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await fetch(
+        `${API_BASE}/api/v1/budget/projects/${projectCode}/template/upload`,
+        { method: "POST", body: fd, credentials: "include" }
+      );
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({ detail: "업로드 실패" }));
+        alert(d.detail || "업로드 실패");
+        return;
+      }
+      const data = await r.json();
+      alert(`${data.imported_count}건 업로드 완료. Time Budget을 다시 로드합니다.`);
+      if (typeof onTemplateImported === "function") {
+        await onTemplateImported();
+      } else {
+        const u = new URL(window.location.href);
+        window.location.href = u.toString();
+      }
+    } catch (err) {
+      alert(`업로드 오류: ${err instanceof Error ? err.message : "알 수 없음"}`);
+    }
+    e.target.value = "";
+  }
+
   const diff = templateTotal.total - etControllable;
 
   let lastCategory = "";
@@ -2499,6 +2581,22 @@ function Step3Template({
         >
           🔄 초기화
         </button>
+        <button
+          type="button"
+          onClick={handleExportTemplate}
+          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
+        >
+          📥 Excel 다운로드
+        </button>
+        <label className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900 cursor-pointer">
+          📤 Excel 업로드
+          <input
+            type="file"
+            accept=".xlsx"
+            className="hidden"
+            onChange={handleImportTemplate}
+          />
+        </label>
         <button
           disabled={categories.length === 0}
           title={categories.length === 0 ? "해당 서비스의 관리단위가 아직 설정되지 않았습니다. 관리자에게 문의하세요." : undefined}
