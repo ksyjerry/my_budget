@@ -1,5 +1,8 @@
 """Budget 입력 API (3-Step Wizard)."""
-from fastapi import APIRouter, Depends, HTTPException
+import io
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -857,3 +860,106 @@ DEFAULT_BUDGET_UNITS = [
     {"category": "내부통제", "unit_name": "운영평가-내부통제-기타프로세스", "sort_order": 140},
     {"category": "IT 감사-RA", "unit_name": "IT 감사-RA", "sort_order": 150},
 ]
+
+
+# ── Step 2 구성원 Excel Export / Upload ──────────────────
+
+
+@router.get("/projects/{project_code}/members/export")
+def export_project_members(
+    project_code: str,
+    user: dict = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """Step 2 구성원 목록 Excel 다운로드."""
+    from openpyxl import Workbook
+
+    members = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_code == project_code)
+        .order_by(ProjectMember.sort_order, ProjectMember.id)
+        .all()
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "구성원"
+    ws.append(["empno", "name", "role", "grade"])
+    for m in members:
+        ws.append([m.empno or "", m.name or "", m.role or "FLDT", m.grade or ""])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="members_{project_code}.xlsx"',
+        },
+    )
+
+
+@router.post("/projects/{project_code}/members/upload")
+async def upload_project_members(
+    project_code: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
+    """Step 2 구성원 목록 Excel 업로드 — FLDT 구성원 truncate+insert."""
+    from openpyxl import load_workbook
+    from app.models.employee import Employee
+
+    assert_can_modify_project(db, user, project_code)
+
+    content = await file.read()
+    wb = load_workbook(io.BytesIO(content), data_only=True)
+    ws = wb.active
+
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+
+    db.query(ProjectMember).filter(
+        ProjectMember.project_code == project_code,
+        ProjectMember.role == "FLDT",
+    ).delete(synchronize_session=False)
+    db.commit()
+
+    imported: list[dict] = []
+    skipped: list[dict] = []
+    for idx, row in enumerate(rows):
+        if not row or not any(c is not None for c in row):
+            continue
+        empno = str(row[0]).strip() if row[0] else ""
+        name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+        role = str(row[2]).strip() if len(row) > 2 and row[2] else "FLDT"
+        grade = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+
+        if not empno:
+            skipped.append({"row": idx + 2, "reason": "empno missing"})
+            continue
+
+        emp = db.query(Employee).filter(Employee.empno == empno).first()
+        if emp is None:
+            skipped.append({"empno": empno, "reason": "not_found"})
+            continue
+        if emp.emp_status and emp.emp_status != "재직":
+            skipped.append({"empno": empno, "reason": "inactive"})
+            continue
+
+        db.add(ProjectMember(
+            project_code=project_code,
+            role=role,
+            name=name or emp.name,
+            empno=empno,
+            grade=grade or (emp.grade_name or ""),
+            sort_order=idx,
+        ))
+        imported.append({"empno": empno, "name": name or emp.name})
+
+    db.commit()
+    return {
+        "imported_count": len(imported),
+        "imported": imported,
+        "skipped": skipped,
+    }
