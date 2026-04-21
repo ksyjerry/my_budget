@@ -1499,6 +1499,7 @@ function Step1Form({
               type="text"
               value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : ""}
               readOnly
+              placeholder="QRP 사번 입력 또는 검색"
               className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
             />
           </div>
@@ -1547,7 +1548,7 @@ function Step1Form({
               min={0}
             />
             <NumberField
-              label="QRP 시간"
+              label="QRP 시간 (수기 입력 가능)"
               value={project.qrp_hours}
               onChange={(v) => pField("qrp_hours", v)}
               contractHours={project.contract_hours}
