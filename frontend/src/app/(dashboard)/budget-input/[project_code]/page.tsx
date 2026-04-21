@@ -1498,88 +1498,138 @@ function Step1Form({
             onClose={() => setShowCloneSearch(false)}
           />
         )}
+        {/* 총 계약시간 */}
+        <div className="mb-4">
+          <div className="grid grid-cols-4 gap-3">
+            <NumberField
+              label="총 계약시간"
+              value={project.contract_hours}
+              onChange={(v) => pField("contract_hours", v)}
+              min={0}
+            />
+          </div>
+        </div>
+
+        {/* Group A: 팀 구성원별 시간 */}
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-pwc-gray-900 mb-2">팀 구성원별 시간</h4>
+          <div className="grid grid-cols-4 gap-3">
+            <NumberField
+              label="AX/DX 시간"
+              value={project.axdx_hours}
+              onChange={(v) => pField("axdx_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="QRP 시간"
+              value={project.qrp_hours}
+              onChange={(v) => pField("qrp_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="RM/CRS/M&T 시간"
+              value={project.rm_hours}
+              onChange={(v) => pField("rm_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="FLDT-EL 시간"
+              value={project.el_hours}
+              onChange={(v) => pField("el_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="FLDT-PM 시간"
+              value={project.pm_hours}
+              onChange={(v) => pField("pm_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="RA-EL/PM 시간"
+              value={project.ra_elpm_hours}
+              onChange={(v) => pField("ra_elpm_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="Fulcrum 시간"
+              value={project.fulcrum_hours}
+              onChange={(v) => pField("fulcrum_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="RA-Staff 시간"
+              value={project.ra_staff_hours}
+              onChange={(v) => pField("ra_staff_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+            <NumberField
+              label="Specialist 시간"
+              value={project.specialist_hours}
+              onChange={(v) => pField("specialist_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+          </div>
+        </div>
+
+        {/* Group B: 기타 차감 항목 */}
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-pwc-gray-900 mb-2">기타 차감 항목</h4>
+          <div className="grid grid-cols-4 gap-3">
+            <NumberField
+              label="출장 시간"
+              value={project.travel_hours}
+              onChange={(v) => pField("travel_hours", v)}
+              contractHours={project.contract_hours}
+              min={0}
+            />
+          </div>
+          <p className="text-xs text-pwc-gray-600 mt-1">
+            * 출장시간도 ET 잔여 시간에서 차감됩니다.
+          </p>
+        </div>
+
+        {/* ET 잔여 시간 (Controllable Budget) */}
         <div className="grid grid-cols-4 gap-3">
-          <NumberField
-            label="총 계약시간"
-            value={project.contract_hours}
-            onChange={(v) => pField("contract_hours", v)}
-            min={0}
-          />
-          <NumberField
-            label="AX/DX 시간"
-            value={project.axdx_hours}
-            onChange={(v) => pField("axdx_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="QRP 시간"
-            value={project.qrp_hours}
-            onChange={(v) => pField("qrp_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="RM/CRS/M&T 시간"
-            value={project.rm_hours}
-            onChange={(v) => pField("rm_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="FLDT-EL 시간"
-            value={project.el_hours}
-            onChange={(v) => pField("el_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="FLDT-PM 시간"
-            value={project.pm_hours}
-            onChange={(v) => pField("pm_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="RA-EL/PM 시간"
-            value={project.ra_elpm_hours}
-            onChange={(v) => pField("ra_elpm_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="Fulcrum 시간"
-            value={project.fulcrum_hours}
-            onChange={(v) => pField("fulcrum_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="RA-Staff 시간"
-            value={project.ra_staff_hours}
-            onChange={(v) => pField("ra_staff_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="Specialist 시간"
-            value={project.specialist_hours}
-            onChange={(v) => pField("specialist_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="출장 시간"
-            value={project.travel_hours}
-            onChange={(v) => pField("travel_hours", v)}
-            contractHours={project.contract_hours}
-            min={0}
-          />
-          <NumberField
-            label="ET Controllable Budget"
-            value={etControllable}
-            readOnly
-          />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1 text-xs font-medium text-pwc-gray-600">
+              ET 잔여 시간 (Controllable Budget)
+              <span
+                className="cursor-help text-pwc-gray-400 ml-0.5"
+                title={
+                  "총 계약시간 − (AX/DX + QRP + RM/CRS/M&T + FLDT-EL + FLDT-PM + " +
+                  "RA-EL/PM + Fulcrum + RA-Staff + Specialist + 출장시간)\n\n" +
+                  "= FLDT 구성원이 집행할 수 있는 실제 Budget 시간"
+                }
+              >
+                ⓘ
+              </span>
+            </div>
+            <input
+              type="text"
+              value={etControllable.toLocaleString("ko-KR")}
+              readOnly
+              className={
+                "w-full px-2 py-1.5 text-sm border rounded text-right bg-pwc-gray-50 " +
+                (etControllable < 0
+                  ? "border-pwc-red text-pwc-red font-semibold"
+                  : "border-pwc-gray-200 text-pwc-gray-900")
+              }
+            />
+            {etControllable < 0 && (
+              <p className="text-xs text-pwc-red mt-0.5">
+                ⚠ 차감 항목 합계가 총 계약시간을 초과합니다. 시간 배분을 재검토하세요.
+              </p>
+            )}
+          </div>
         </div>
       </section>
     </div>
