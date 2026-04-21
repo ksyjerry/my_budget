@@ -2403,6 +2403,23 @@ function Step3Template({
         </button>
         <div className="flex-1" />
         <button
+          type="button"
+          onClick={() => {
+            if (!confirm("Time Budget 의 모든 입력값을 초기화 합니다. 계속하시겠습니까?")) return;
+            setRows(rows.map((r) => ({
+              ...r,
+              enabled: false,
+              empno: "",
+              emp_name: "",
+              grade: "",
+              months: Object.fromEntries(MONTHS.map((m) => [m, 0])) as Record<string, number>,
+            })));
+          }}
+          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-lg hover:bg-pwc-gray-50 text-pwc-gray-900"
+        >
+          🔄 초기화
+        </button>
+        <button
           disabled={categories.length === 0}
           title={categories.length === 0 ? "해당 서비스의 관리단위가 아직 설정되지 않았습니다. 관리자에게 문의하세요." : undefined}
           onClick={() => setShowAddRow(true)}
