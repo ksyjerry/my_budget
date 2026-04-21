@@ -777,7 +777,7 @@ export default function BudgetWizardPage() {
       </div>
 
       {/* Bottom Step Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between z-10 relative">
         <div>
           {step > 1 && (
             <button
@@ -2266,7 +2266,7 @@ function Step3Template({
       </div>
 
       {/* AI Assist + Add Row Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <button
           onClick={handleAiSuggest}
           disabled={aiLoading || etControllable <= 0}
@@ -2328,8 +2328,8 @@ function Step3Template({
                 className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange disabled:bg-pwc-gray-50"
               >
                 <option value="">선택하세요</option>
-                {filteredUnits.map((u) => (
-                  <option key={u.unit_name} value={u.unit_name}>{u.unit_name}</option>
+                {filteredUnits.map((u, ui) => (
+                  <option key={`${ui}-${u.unit_name}`} value={u.unit_name}>{u.unit_name}</option>
                 ))}
               </select>
             </div>
@@ -2418,7 +2418,7 @@ function Step3Template({
       )}
 
       {/* Excel-like Spreadsheet Grid */}
-      <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm">
+      <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm pb-24">
         <table ref={gridRef} className="w-full text-xs whitespace-nowrap border-collapse select-none" style={{ tableLayout: "fixed" }}>
           <colgroup><col style={{ width: 32 }} /><col style={{ width: 100 }} /><col style={{ width: 180 }} /><col style={{ width: 140 }} /><col style={{ width: 68 }} /><col style={{ width: 56 }} />{MONTHS.map((m) => <col key={m} style={{ width: 52 }} />)}<col style={{ width: 56 }} /></colgroup>
           <thead className="bg-pwc-gray-50 sticky top-0 z-10">
@@ -2492,8 +2492,8 @@ function Step3Template({
                     >
                       {budgetUnits
                         .filter((u) => u.category === row.budget_category)
-                        .map((u) => (
-                          <option key={u.unit_name} value={u.unit_name}>{u.unit_name}</option>
+                        .map((u, ui) => (
+                          <option key={`${ui}-${u.unit_name}`} value={u.unit_name}>{u.unit_name}</option>
                         ))}
                     </select>
                   </td>
