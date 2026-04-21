@@ -79,6 +79,30 @@ export default function BudgetInputPage() {
         </Link>
       </div>
 
+      <button
+        type="button"
+        onClick={async () => {
+          const res = await fetch(
+            `${API_BASE}/api/v1/budget/template/blank-export`,
+            { credentials: "include" }
+          );
+          if (!res.ok) {
+            alert("다운로드 실패");
+            return;
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "budget_template_blank.xlsx";
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+        className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
+      >
+        빈 Budget Template 다운로드
+      </button>
+
       <input
         type="text"
         placeholder="프로젝트명, 코드, EL명 검색..."

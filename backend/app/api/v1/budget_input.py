@@ -1110,3 +1110,31 @@ async def upload_project_members(
         "imported": imported,
         "skipped": skipped,
     }
+
+
+@router.get("/template/blank-export")
+def export_blank_budget_template(user: dict = Depends(require_login)):
+    """비활성 상태에서도 받을 수 있는 빈 Budget Template Excel."""
+    import datetime as _dt
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Time Budget"
+    base_year = _dt.datetime.now().year
+    months: list = []
+    for i in range(12):
+        m = ((4 - 1 + i) % 12) + 1
+        y = base_year + (1 if i >= 9 else 0)
+        months.append(f"{y}-{m:02d}")
+    headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
+    ws.append(headers)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="budget_template_blank.xlsx"'},
+    )
