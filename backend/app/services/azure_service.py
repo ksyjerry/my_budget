@@ -387,7 +387,6 @@ def get_overview_actuals(
 
         if staff_set and emp in staff_set:
             by_empno[emp] += t
-            by_project_empno[(pc, emp)] += t
 
     return {
         "by_project": dict(by_project),
