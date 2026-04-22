@@ -20,7 +20,7 @@ services:
       - "3001:3001"
     volumes:
       - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 3001 --reload
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 3001 --reload"
 
   frontend:
     build: ./frontend
