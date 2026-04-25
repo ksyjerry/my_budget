@@ -364,3 +364,49 @@ No collection errors. All warnings are infrastructure-level and do not affect te
 4. Keep `pyproject.toml` in version control (pytest will auto-discover it)
 
 ---
+
+## Area 1 — Final Verification (Task 35)
+
+**Date:** 2026-04-25
+**Commits ahead of main:** 40
+
+### Local results
+
+- **Backend pytest:** 190 passed / 10 skipped / 0 failed
+  - Fixed pre-existing test isolation bug: `test_auth_endpoints._cleanup_sessions` (autouse, setup) was
+    deleting DB sessions for EL_EMPNO/STAFF_EMPNO before each auth test, invalidating the
+    session-scoped `elpm_cookie`/`staff_cookie`/`admin_cookie` conftest fixtures used by 11+ other files.
+    Fix: changed cookie fixtures to `scope="function"` + `_cleanup_sessions` to setup+teardown.
+  - Was: 179 passed / 11 failed / 10 skipped (ordering-dependent)
+
+- **Frontend Playwright (default + regression):**
+  - `default` project: 74 passed / 4 failed / 8 skipped
+    - 3 infra failures: `task-auth-prod-overlay`, `task-azure-client-sync`, `task-azure-employee-sync` (require prod/external)
+    - 1 deferred: `task-insurance-actuarial` — ACT count regression routed to 영역 5
+  - `regression` project (dev mode): 2 passed / 2 failed (regression #67 — expected, needs prod build)
+  - `regression #67` against prod build: 2/2 PASS
+
+- **Grep guards:** 3/3 PASS
+  - `check-no-direct-number-input.sh` — OK
+  - `check-no-direct-budget-arithmetic.sh` — OK
+  - `check-docker-compose-no-dev.sh` — OK
+  - Note: guards must be run from worktree root (not absolute path) to resolve ROOTS correctly
+
+### Push & PR
+
+- **Push:** SUCCESS — branch `s7/area-1-safety-net` pushed to origin (40 commits ahead of main)
+- **Draft PR:** https://github.com/ksyjerry/my_budget/pull/1
+
+### Outstanding
+
+- `task-insurance-actuarial` — ACT count returns wrong number; routed to 영역 5 (outside Area 1 scope)
+- `task-azure-*` — require live Azure SQL or admin credentials; infra limitation, not a code regression
+- `task-auth-prod-overlay` — requires prod build for test; passes when run against prod (`regression #67`)
+
+### Hand-off to user
+
+- Next: user runs Phase E Layer 2 manual QA from `docs/superpowers/qa-checklists/area-1.md`
+- Then: user signs off Phase E Layer 3 → Area 1 closes
+- CI on PR #1 will run independently — Linux visual regression baseline may differ from local darwin baseline (expected)
+
+---
