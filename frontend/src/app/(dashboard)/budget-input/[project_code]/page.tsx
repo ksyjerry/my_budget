@@ -2812,17 +2812,16 @@ function Step3Template({
                             onClick={() => row.enabled && handleCellClick(currentVisualRow, colIdx)}
                           >
                             {isEditing && row.enabled ? (
-                              <input
-                                type="number"
+                              <NumberField
                                 autoFocus
-                                value={row.months[month] || ""}
-                                onChange={(e) => updateRowMonth(idx, month, Number(e.target.value) || 0)}
+                                value={row.months[month] || 0}
+                                step={0.25}
+                                min={0}
+                                max={300}
+                                onChange={(v) => updateRowMonth(idx, month, v)}
                                 onKeyDown={(e) => handleGridKeyDown(e, currentVisualRow, colIdx)}
                                 onBlur={() => { setEditingCell(null); }}
                                 className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
-                                min={0}
-                                max={300}
-                                step={0.25}
                               />
                             ) : (
                               <div className="px-1 py-1 min-h-[24px] text-xs">

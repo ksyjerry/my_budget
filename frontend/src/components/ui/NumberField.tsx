@@ -18,6 +18,14 @@ export interface NumberFieldProps {
   /** Optional placeholder for editable mode. */
   placeholder?: string;
   className?: string;
+  /** Forward autoFocus to the inner <input>. */
+  autoFocus?: boolean;
+  /** Forward onKeyDown to the inner <input>. */
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  /** Called after the internal step-snap onBlur handler. */
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  /** Ref forwarded to the inner <input> element. */
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
 /**
@@ -43,6 +51,10 @@ export function NumberField(props: NumberFieldProps) {
     contractHours,
     placeholder,
     className,
+    autoFocus,
+    onKeyDown,
+    onBlur: onBlurProp,
+    inputRef,
   } = props;
 
   const effectiveMin = allowNegative ? (min < 0 ? min : -Number.MAX_SAFE_INTEGER) : min;
@@ -80,6 +92,7 @@ export function NumberField(props: NumberFieldProps) {
         </label>
       )}
       <input
+        ref={inputRef}
         type={readOnly ? "text" : "number"}
         value={display}
         step={step}
@@ -87,8 +100,13 @@ export function NumberField(props: NumberFieldProps) {
         max={max}
         readOnly={readOnly}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         onChange={(e) => handleChange(e.target.value)}
-        onBlur={(e) => handleChange(e.target.value)}
+        onBlur={(e) => {
+          handleChange(e.target.value);
+          onBlurProp?.(e);
+        }}
+        onKeyDown={onKeyDown}
         className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
           readOnly
             ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
