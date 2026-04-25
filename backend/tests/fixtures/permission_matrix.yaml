@@ -1,0 +1,238 @@
+# Permission matrix for all 23 write (POST/PUT/DELETE/PATCH) endpoints.
+#
+# Guard legend:
+#   require_admin  → only admin allowed; elpm/staff → 403; anon → 401
+#   require_elpm   → admin + elpm allowed; staff → 403; anon → 401
+#   require_elpm + assert_can_modify_project(RT-AUDIT-MIN-001)
+#                 → admin + elpm(170661 is EL) allowed; staff → 403; anon → 401
+#   require_login  → all logged-in → 200-range; anon → 401
+#   no guard       → everyone → 200-range (login/logout are public)
+#
+# For "allowed" personas the expected code is 200 (or 201/202/422 are also fine
+# because the test uses bucket logic — only checks that it is NOT 401/403).
+# We encode 200 to mean "access granted" here; the test logic handles variants.
+
+# ── /api/v1/sync/* ──────────────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/sync/employees
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/sync/teams
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/sync/actual
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/sync/clients
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+# ── /api/v1/auth/* ──────────────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/auth/login
+  guards: []
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 200
+
+- method: POST
+  path: /api/v1/auth/logout
+  guards: []
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 200
+
+# ── /api/v1/budget/* (budget_input router) ──────────────────────────────────
+
+- method: POST
+  path: /api/v1/budget/projects
+  guards: [require_elpm]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: PUT
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001
+  guards: [require_elpm, assert_can_modify_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: DELETE
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001
+  guards: [require_elpm, assert_can_delete_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: PUT
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/members
+  guards: [require_elpm, assert_can_modify_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/template/upload
+  guards: [require_elpm, assert_can_modify_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: PUT
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/template
+  guards: [require_elpm, assert_can_modify_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/members/upload
+  guards: [require_elpm, assert_can_modify_project]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+# ── /api/v1/budget/upload (budget_upload router) ────────────────────────────
+
+- method: POST
+  path: /api/v1/budget/upload
+  guards: [require_elpm]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+# ── /api/v1/budget-assist/* ─────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/budget-assist/suggest
+  guards: [require_login]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 401
+
+- method: POST
+  path: /api/v1/budget-assist/validate
+  guards: [require_login]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 401
+
+# ── /api/v1/cache/* ─────────────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/cache/clear
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/cache/warmup
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+# ── /api/v1/chat/* ──────────────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/chat
+  guards: [require_login]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 401
+
+# ── /api/v1/admin/* ─────────────────────────────────────────────────────────
+
+- method: PUT
+  path: /api/v1/admin/partners/160553
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: DELETE
+  path: /api/v1/admin/sessions/by-empno/999999
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+- method: POST
+  path: /api/v1/admin/sync-non-audit-activities
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
+
+# ── /api/v1/tracking/* ──────────────────────────────────────────────────────
+
+- method: POST
+  path: /api/v1/tracking/sync
+  guards: [require_admin]
+  expected:
+    admin: 200
+    elpm: 403
+    staff: 403
+    anon: 401
