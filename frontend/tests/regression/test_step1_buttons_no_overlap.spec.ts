@@ -8,6 +8,7 @@ test.describe("regression #99 — Step 1 nav buttons do not overlap", () => {
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', EL);
     await page.click('button[type="submit"]');
+    await page.waitForURL((url) => !url.toString().includes("/login"));
     await page.goto(`${FRONTEND}/budget-input/new`);
     await page.waitForLoadState("networkidle");
 
