@@ -21,6 +21,15 @@ def client():
 
 @pytest.fixture(autouse=True)
 def _cleanup_sessions():
+    """Setup+teardown: clean before and after each auth test for isolation.
+    The conftest cookie fixtures (elpm_cookie / staff_cookie) are function-scoped,
+    so they re-create sessions each time and aren't affected by this cleanup."""
+    _delete_test_sessions()
+    yield
+    _delete_test_sessions()
+
+
+def _delete_test_sessions():
     db = SessionLocal()
     try:
         for e in (EL_EMPNO, STAFF_EMPNO, BOGUS_EMPNO):

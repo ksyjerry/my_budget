@@ -40,21 +40,26 @@ def _ensure_session(empno: str, role: str, scope: str = "self") -> str:
         s.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def elpm_cookie():
-    """Session cookie for EL/PM user (최성우 170661)."""
+    """Session cookie for EL/PM user (최성우 170661).
+
+    Function-scoped so the session is always valid — auth tests delete sessions
+    for this empno as part of their isolation cleanup, so session scope would
+    leave subsequent tests with a revoked/deleted session ID.
+    """
     sid = _ensure_session("170661", "elpm")
     return {SESSION_COOKIE_NAME: sid}
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def staff_cookie():
     """Session cookie for Staff user (지해나 320915)."""
     sid = _ensure_session("320915", "staff")
     return {SESSION_COOKIE_NAME: sid}
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def admin_cookie():
     """Session cookie for admin. ADMIN_EMPNO env overrides; fallback 160553."""
     empno = os.environ.get("ADMIN_EMPNO", "160553")
