@@ -19,72 +19,7 @@ import {
   generateMonths,
   generateMonthLabels,
 } from "@/lib/budget-constants";
-
-// ── NumberField (외부 정의 — re-render 시 focus 유지) ──
-interface NumberFieldProps {
-  label: string;
-  value?: number;
-  onChange?: (v: number) => void;
-  readOnly?: boolean;
-  step?: number;
-  min?: number;
-  max?: number;
-  allowNegative?: boolean;
-  contractHours?: number;
-}
-
-function NumberField(props: NumberFieldProps) {
-  const {
-    label,
-    value,
-    onChange,
-    readOnly,
-    step = 1,
-    min,
-    max,
-    allowNegative = false,
-    contractHours,
-  } = props;
-
-  const pct = contractHours && contractHours > 0 && value
-    ? `${Math.round(value / contractHours * 100)}%`
-    : null;
-
-  const display =
-    readOnly && typeof value === "number"
-      ? value.toLocaleString("ko-KR")
-      : value ?? "";
-
-  return (
-    <div>
-      <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-        {label}
-        {pct && <span className="ml-1 text-pwc-orange">({pct})</span>}
-      </label>
-      <input
-        type={readOnly ? "text" : "number"}
-        value={display}
-        step={step}
-        min={min}
-        max={max}
-        readOnly={readOnly}
-        onChange={(e) => {
-          let v = parseFloat(e.target.value);
-          if (Number.isNaN(v)) v = 0;
-          if (!allowNegative && v < 0) v = 0;
-          if (typeof min === "number" && v < min) v = min;
-          if (typeof max === "number" && v > max) v = max;
-          onChange?.(v);
-        }}
-        className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-          readOnly
-            ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
-            : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
-        }`}
-      />
-    </div>
-  );
-}
+import { NumberField } from "@/components/ui/NumberField";
 
 // ── Types ──────────────────────────────────────────
 interface ProjectInfo {
