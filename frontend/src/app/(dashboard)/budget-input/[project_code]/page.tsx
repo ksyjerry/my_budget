@@ -1478,6 +1478,7 @@ function Step1Form({
               type="text"
               value={project.project_name}
               readOnly
+              placeholder="프로젝트명"
               className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
             />
           </div>
@@ -1520,10 +1521,10 @@ function Step1Form({
             </label>
             <input
               type="text"
-              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : ""}
-              readOnly
+              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : project.qrp_empno}
+              onChange={(e) => pField("qrp_empno", e.target.value)}
               placeholder="QRP 사번 입력 또는 검색"
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
             />
           </div>
         </div>
