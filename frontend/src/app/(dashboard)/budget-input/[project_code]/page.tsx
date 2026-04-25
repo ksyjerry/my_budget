@@ -1747,7 +1747,7 @@ function EmployeeSearch({
     if (q.length < 1) { setResults([]); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/budget/employees/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${API_BASE}/api/v1/budget/employees/search?q=${encodeURIComponent(q)}&include_inactive=true`);
       if (res.ok) setResults(await res.json());
     } finally {
       setLoading(false);
@@ -1776,6 +1776,9 @@ function EmployeeSearch({
             const r = results[0];
             if (r.emp_status && r.emp_status !== "재직") {
               alert(`사번 ${r.empno} 은(는) 현재 재직 중인 직원이 아닙니다. 퇴사/휴직 상태입니다.`);
+              setQuery("");
+              setResults([]);
+              setOpen(false);
               return;
             }
             onSelect(r.name, r.empno, r.grade);
