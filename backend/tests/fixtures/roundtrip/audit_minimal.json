@@ -1,0 +1,37 @@
+{
+  "name": "audit_minimal",
+  "service_type": "AUDIT",
+  "skip_until_pol": null,
+  "expect_validation_error": false,
+  "project": {
+    "project_code": "RT-AUDIT-MIN-001",
+    "project_name": "Roundtrip Audit Minimal",
+    "department": "TestDept",
+    "el_empno": "170661",
+    "pm_empno": "170661",
+    "qrp_empno": null,
+    "contract_hours": 100,
+    "axdx_hours": 0,
+    "fiscal_start": "2026-04-01",
+    "service_type": "AUDIT"
+  },
+  "members": [
+    {
+      "empno": "320915",
+      "name": "지해나",
+      "role": "FLDT 구성원",
+      "grade": "Staff",
+      "activity_mapping": "재무제표기말감사"
+    }
+  ],
+  "template_rows": [
+    {
+      "budget_category": "계획단계",
+      "budget_unit": "계획단계",
+      "empno": "320915",
+      "emp_name": "지해나",
+      "grade": "Staff",
+      "months": {"2026-04": 8.0}
+    }
+  ]
+}
