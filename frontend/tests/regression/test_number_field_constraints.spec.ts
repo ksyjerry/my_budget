@@ -8,6 +8,8 @@ test.describe("regression #74 — NumberField rejects negative / step-violations
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', EL);
     await page.click('button[type="submit"]');
+    // Wait for navigation away from login (post-redirect will be /, /overview, etc.)
+    await page.waitForURL((url) => !url.toString().includes("/login")); // wait for login redirect
     await page.goto(`${FRONTEND}/budget-input/new`);
     await page.waitForLoadState("networkidle");
 
@@ -21,6 +23,8 @@ test.describe("regression #74 — NumberField rejects negative / step-violations
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', EL);
     await page.click('button[type="submit"]');
+    // Wait for navigation away from login (post-redirect will be /, /overview, etc.)
+    await page.waitForURL((url) => !url.toString().includes("/login")); // wait for login redirect
 
     await page.goto(`${FRONTEND}/budget-input`);
     await page.waitForLoadState("networkidle");

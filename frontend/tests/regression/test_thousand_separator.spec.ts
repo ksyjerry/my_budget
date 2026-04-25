@@ -8,6 +8,8 @@ test.describe("regression #70 — readOnly numeric fields display thousand separ
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', EL);
     await page.click('button[type="submit"]');
+    // Wait for authentication redirect away from login before accessing protected page
+    await page.waitForURL((url) => !url.toString().includes("/login"));
     await page.goto(`${FRONTEND}/budget-input/new`);
     await page.waitForLoadState("networkidle");
 
