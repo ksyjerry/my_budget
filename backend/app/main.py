@@ -12,7 +12,7 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
-from app.api.v1 import auth, budget_upload, budget_input, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist, tracking, sync
+from app.api.v1 import auth, budget_upload, budget_input, budget_workflow, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist, tracking, sync
 
 app = FastAPI(title=settings.APP_NAME, version="0.1.0")
 
@@ -124,6 +124,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(budget_upload.router, prefix="/api/v1/budget", tags=["budget-upload"])
 app.include_router(budget_input.router, prefix="/api/v1/budget", tags=["budget-input"])
+app.include_router(budget_workflow.router, prefix="/api/v1/budget", tags=["budget-workflow"])
 app.include_router(overview.router, prefix="/api/v1", tags=["overview"])
 app.include_router(projects.router, prefix="/api/v1", tags=["projects"])
 app.include_router(assignments.router, prefix="/api/v1", tags=["assignments"])
