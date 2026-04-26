@@ -1365,119 +1365,6 @@ function Step1Form({
         />
       )}
 
-      {/* 클라이언트 기본정보 */}
-      <section>
-        <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
-          <h3 className="text-sm font-bold text-pwc-black">
-            클라이언트 기본정보
-          </h3>
-          <button
-            type="button"
-            onClick={() => setShowClientSearch(true)}
-            className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
-          >
-            클라이언트 검색
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {!isAudit && (
-            <div className="col-span-full text-xs text-pwc-gray-600 bg-pwc-gray-50 rounded-md p-2 mb-3">
-              비감사 서비스는 표준산업분류 · 자산규모 · 상장여부 3가지 정보만 입력합니다.
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              Client Code
-            </label>
-            <input
-              type="text"
-              value={client.client_code}
-              onChange={(e) => cField("client_code", e.target.value)}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              Client Name
-            </label>
-            <input
-              type="text"
-              value={client.client_name}
-              onChange={(e) => cField("client_name", e.target.value)}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <SelectField
-            label="표준산업분류"
-            value={client.industry}
-            options={INDUSTRY_OPTIONS}
-            onChange={(v) => cField("industry", v)}
-          />
-          <SelectField
-            label="자산규모"
-            value={client.asset_size}
-            options={ASSET_SIZE_OPTIONS}
-            onChange={(v) => cField("asset_size", v)}
-          />
-          <SelectField
-            label="상장여부"
-            value={client.listing_status}
-            options={LISTING_OPTIONS}
-            onChange={(v) => cField("listing_status", v)}
-          />
-          {isAudit && (
-            <SelectField
-              label="사업보고서"
-              value={client.business_report}
-              options={BUSINESS_REPORT_OPTIONS}
-              onChange={(v) => cField("business_report", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="GAAP"
-              value={client.gaap}
-              options={GAAP_OPTIONS}
-              onChange={(v) => cField("gaap", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="연결재무제표"
-              value={client.consolidated}
-              options={CONSOLIDATED_OPTIONS}
-              onChange={(v) => cField("consolidated", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="연결자회사수"
-              value={client.subsidiary_count}
-              options={SUBSIDIARY_OPTIONS}
-              onChange={(v) => cField("subsidiary_count", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="내부회계관리제도"
-              value={client.internal_control}
-              options={INTERNAL_CONTROL_OPTIONS}
-              onChange={(v) => cField("internal_control", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="초도/계속감사"
-              value={client.initial_audit}
-              options={AUDIT_TYPE_OPTIONS}
-              onChange={(v) => cField("initial_audit", v)}
-            />
-          )}
-        </div>
-      </section>
-
       {/* Project Search Modal */}
       {showProjectSearch && (
         <ProjectSearchModal
@@ -1648,6 +1535,119 @@ function Step1Form({
               className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
             />
           </div>
+        </div>
+      </section>
+
+      {/* 클라이언트 기본정보 */}
+      <section>
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
+          <h3 className="text-sm font-bold text-pwc-black">
+            클라이언트 기본정보
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowClientSearch(true)}
+            className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
+          >
+            클라이언트 검색
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {!isAudit && (
+            <div className="col-span-full text-xs text-pwc-gray-600 bg-pwc-gray-50 rounded-md p-2 mb-3">
+              비감사 서비스는 표준산업분류 · 자산규모 · 상장여부 3가지 정보만 입력합니다.
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              Client Code
+            </label>
+            <input
+              type="text"
+              value={client.client_code}
+              onChange={(e) => cField("client_code", e.target.value)}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              Client Name
+            </label>
+            <input
+              type="text"
+              value={client.client_name}
+              onChange={(e) => cField("client_name", e.target.value)}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <SelectField
+            label="표준산업분류"
+            value={client.industry}
+            options={INDUSTRY_OPTIONS}
+            onChange={(v) => cField("industry", v)}
+          />
+          <SelectField
+            label="자산규모"
+            value={client.asset_size}
+            options={ASSET_SIZE_OPTIONS}
+            onChange={(v) => cField("asset_size", v)}
+          />
+          <SelectField
+            label="상장여부"
+            value={client.listing_status}
+            options={LISTING_OPTIONS}
+            onChange={(v) => cField("listing_status", v)}
+          />
+          {isAudit && (
+            <SelectField
+              label="사업보고서"
+              value={client.business_report}
+              options={BUSINESS_REPORT_OPTIONS}
+              onChange={(v) => cField("business_report", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="GAAP"
+              value={client.gaap}
+              options={GAAP_OPTIONS}
+              onChange={(v) => cField("gaap", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결재무제표"
+              value={client.consolidated}
+              options={CONSOLIDATED_OPTIONS}
+              onChange={(v) => cField("consolidated", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결자회사수"
+              value={client.subsidiary_count}
+              options={SUBSIDIARY_OPTIONS}
+              onChange={(v) => cField("subsidiary_count", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="내부회계관리제도"
+              value={client.internal_control}
+              options={INTERNAL_CONTROL_OPTIONS}
+              onChange={(v) => cField("internal_control", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="초도/계속감사"
+              value={client.initial_audit}
+              options={AUDIT_TYPE_OPTIONS}
+              onChange={(v) => cField("initial_audit", v)}
+            />
+          )}
         </div>
       </section>
 
