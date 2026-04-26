@@ -1,4 +1,6 @@
 from logging.config import fileConfig
+import os
+from pathlib import Path
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
@@ -15,6 +17,14 @@ from app.models.budget_master import (
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override sqlalchemy.url from .env file DATABASE_URL if present
+_env_file = Path(__file__).parent.parent / ".env"
+if _env_file.exists():
+    for line in _env_file.read_text().splitlines():
+        if line.startswith("DATABASE_URL="):
+            config.set_main_option("sqlalchemy.url", line.split("=", 1)[1].strip())
+            break
 
 target_metadata = Base.metadata
 
