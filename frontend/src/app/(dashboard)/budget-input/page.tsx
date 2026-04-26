@@ -13,6 +13,7 @@ interface BudgetProject {
   pm_name: string;
   template_status: string;
   contract_hours: number;
+  updated_at: string | null;
 }
 
 export default function BudgetInputPage() {
@@ -34,6 +35,7 @@ export default function BudgetInputPage() {
             pm_name: p.pm_name || "",
             template_status: (p.template_status as string) || "작성중",
             contract_hours: (p.contract_hours as number) || 0,
+            updated_at: (p.updated_at as string) || null,
           }))
         );
       }
@@ -115,6 +117,7 @@ export default function BudgetInputPage() {
               <th className="px-4 py-2.5 text-left text-xs font-semibold text-pwc-gray-600">PM</th>
               <th className="px-4 py-2.5 text-right text-xs font-semibold text-pwc-gray-600">계약시간</th>
               <th className="px-4 py-2.5 text-center text-xs font-semibold text-pwc-gray-600">작성상태</th>
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-pwc-gray-600">마지막 수정</th>
               <th className="px-4 py-2.5 text-center text-xs font-semibold text-pwc-gray-600">액션</th>
             </tr>
           </thead>
@@ -136,6 +139,15 @@ export default function BudgetInputPage() {
                   }`}>
                     {p.template_status}
                   </span>
+                </td>
+                <td className="px-4 py-2.5 text-xs text-pwc-gray-600">
+                  {p.updated_at
+                    ? new Date(p.updated_at).toLocaleDateString("ko-KR", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                      })
+                    : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   <div className="flex items-center justify-center gap-2">
