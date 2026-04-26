@@ -98,6 +98,72 @@ from sqlalchemy.orm import Session as DBSessionType
 from app.models.project import ServiceTaskMaster
 
 
+FEEDBACK_XLSX = Path("/Users/jkim564/Documents/Programming/my_budget/files/Budget+ 2.0 Feedback_0425.xlsx")
+FINANCIAL_SHEET = "#04_감사_금융업"
+
+
+def import_financial_activities(db: DBSessionType) -> dict:
+    """Import 금융업 audit activities from #04_감사_금융업 sheet into ServiceTaskMaster.
+
+    POL-03 (a): 소분류명을 별도 컬럼(subcategory_name) 으로 저장.
+    Returns count summary.
+    """
+    if not FEEDBACK_XLSX.exists():
+        return {"error": f"feedback xlsx not found at {FEEDBACK_XLSX}"}
+
+    wb = openpyxl.load_workbook(FEEDBACK_XLSX, data_only=True)
+    ws = wb[FINANCIAL_SHEET]
+
+    inserted = 0
+    skipped = 0
+    order = 0
+
+    for row in ws.iter_rows(min_row=4, values_only=True):
+        if not row or all(v is None for v in row):
+            continue
+        # Columns: None | cat_code | cat_name | mid_code | mid_name | sub_code | sub_name | budget_unit
+        cat_code = _stripped(row[1]) if len(row) > 1 else None
+        cat_name = _stripped(row[2]) if len(row) > 2 else None
+        mid_code = _stripped(row[3]) if len(row) > 3 else None
+        mid_name = _stripped(row[4]) if len(row) > 4 else None
+        sub_code = _stripped(row[5]) if len(row) > 5 else None
+        sub_name = _stripped(row[6]) if len(row) > 6 else None
+        budget_unit = _stripped(row[7]) if len(row) > 7 else None
+
+        if not budget_unit:
+            skipped += 1
+            continue
+
+        # Idempotent: skip if already exists with same service_type + budget_unit + subcategory_name
+        existing = db.query(ServiceTaskMaster).filter(
+            ServiceTaskMaster.service_type == "AUDIT",
+            ServiceTaskMaster.budget_unit == budget_unit,
+            ServiceTaskMaster.subcategory_name == sub_name,
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+
+        order += 1
+        item = ServiceTaskMaster(
+            service_type="AUDIT",
+            task_category=cat_name,       # 대분류명 → task_category
+            activity_subcategory=mid_name, # 중분류명 → activity_subcategory
+            activity_detail=sub_code,     # 소분류코드 → activity_detail
+            subcategory_name=sub_name,    # 소분류명 → subcategory_name (POL-03)
+            task_name=sub_name or budget_unit,
+            budget_unit=budget_unit,
+            sort_order=order,
+            source_file=FEEDBACK_XLSX.name,
+        )
+        db.add(item)
+        inserted += 1
+
+    db.commit()
+    wb.close()
+    return {"inserted": inserted, "skipped": skipped}
+
+
 def import_non_audit_activities(
     db: DBSessionType,
     path: str,
