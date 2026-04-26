@@ -1748,28 +1748,10 @@ function Step1Form({
               contractHours={project.contract_hours}
               min={0}
             />
-            <NumberField
-              label="Fulcrum 시간"
-              value={project.fulcrum_hours}
-              onChange={(v) => pField("fulcrum_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
-            <NumberField
-              label="RA-Staff 시간"
-              value={project.ra_staff_hours}
-              onChange={(v) => pField("ra_staff_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
-            <NumberField
-              label="Specialist 시간"
-              value={project.specialist_hours}
-              onChange={(v) => pField("specialist_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
           </div>
+          <p className="text-xs text-pwc-gray-600 italic mt-1">
+            ※ Fulcrum / RA-Staff / Specialist 시간은 Step 3 (Time Budget) 에서 분배 입력합니다.
+          </p>
         </div>
 
         {/* Group B: 기타 차감 항목 */}
