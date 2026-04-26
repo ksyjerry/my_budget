@@ -17,6 +17,7 @@ interface BudgetProject {
 
 export default function BudgetInputPage() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [allProjects, setAllProjects] = useState<BudgetProject[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -60,13 +61,16 @@ export default function BudgetInputPage() {
   };
 
   const lc = search.toLowerCase();
-  const filtered = allProjects.filter(
-    (p) =>
+  const filtered = allProjects.filter((p) => {
+    if (statusFilter && p.template_status !== statusFilter) return false;
+    if (!lc) return true;
+    return (
       p.project_name.toLowerCase().includes(lc) ||
       p.project_code.toLowerCase().includes(lc) ||
       p.el_name.toLowerCase().includes(lc) ||
       p.pm_name.toLowerCase().includes(lc)
-  );
+    );
+  });
 
 
   return (
@@ -81,13 +85,25 @@ export default function BudgetInputPage() {
         </Link>
       </div>
 
-      <input
-        type="text"
-        placeholder="프로젝트명, 코드, EL명 검색..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-md px-3 py-2 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
-      />
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          placeholder="프로젝트명, 코드, EL/PM명 검색..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full max-w-md px-3 py-2 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+        >
+          <option value="">전체 상태</option>
+          <option value="작성중">작성중</option>
+          <option value="작성완료">작성완료</option>
+          <option value="승인완료">승인완료</option>
+        </select>
+      </div>
 
       <div className="bg-white rounded-lg border border-pwc-gray-100 overflow-hidden">
         <table className="w-full text-sm">
@@ -112,7 +128,9 @@ export default function BudgetInputPage() {
                 <td className="px-4 py-2.5 text-right">{p.contract_hours.toLocaleString()}</td>
                 <td className="px-4 py-2.5 text-center">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    p.template_status === "작성완료"
+                    p.template_status === "승인완료"
+                      ? "bg-blue-50 text-blue-700"
+                      : p.template_status === "작성완료"
                       ? "bg-green-50 text-pwc-green"
                       : "bg-yellow-50 text-pwc-orange"
                   }`}>
