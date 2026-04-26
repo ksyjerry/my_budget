@@ -53,8 +53,8 @@ def test_staff_controllable_budget_uses_field():
     assert staff_controllable_budget(p) == 348.0
 
 
-def test_display_budget_raises_until_pol01_decided():
+def test_display_budget_pol01_b_activated():
+    """POL-01 (b) 활성화 후 display_budget은 axdx_excluded_budget() 반환 (영역 6)."""
     from app.services.budget_definitions import display_budget
-    p = make_project()
-    with pytest.raises(NotImplementedError, match="POL-01"):
-        display_budget(p, view="overview_kpi_total_contract")
+    p = make_project(contract_hours=500.0, axdx_hours=77.0)
+    assert display_budget(p, view="overview_kpi_total_contract") == 423.0
