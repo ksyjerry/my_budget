@@ -1336,29 +1336,50 @@ function Step1Form({
               );
               if (r.ok) {
                 const info = await r.json();
-                const base = client;
                 setClient({
-                  ...base,
                   ...c,
-                  industry: base.industry || info.industry || "",
-                  asset_size: base.asset_size || info.asset_size || "",
-                  listing_status:
-                    base.listing_status || info.listing_status || "",
+                  industry: info.industry || c.industry || "",
+                  asset_size: info.asset_size || c.asset_size || "",
+                  listing_status: info.listing_status || c.listing_status || "",
                   business_report:
-                    base.business_report || info.business_report || "",
-                  gaap: base.gaap || info.gaap || "",
-                  consolidated: base.consolidated || info.consolidated || "",
+                    info.business_report || c.business_report || "",
+                  gaap: info.gaap || c.gaap || "",
+                  consolidated: info.consolidated || c.consolidated || "",
                   subsidiary_count:
-                    base.subsidiary_count || info.subsidiary_count || "",
+                    info.subsidiary_count || c.subsidiary_count || "",
                   internal_control:
-                    base.internal_control || info.internal_control || "",
-                  initial_audit: base.initial_audit || info.initial_audit || "",
+                    info.internal_control || c.internal_control || "",
+                  initial_audit: info.initial_audit || c.initial_audit || "",
                 });
               } else {
-                setClient({ ...client, ...c });
+                // Reset to new client's own values — don't preserve previous
+                setClient({
+                  ...c,
+                  industry: c.industry || "",
+                  asset_size: c.asset_size || "",
+                  listing_status: c.listing_status || "",
+                  business_report: c.business_report || "",
+                  gaap: c.gaap || "",
+                  consolidated: c.consolidated || "",
+                  subsidiary_count: c.subsidiary_count || "",
+                  internal_control: c.internal_control || "",
+                  initial_audit: c.initial_audit || "",
+                });
               }
             } catch {
-              setClient({ ...client, ...c });
+              // Reset to new client's values — don't preserve previous
+              setClient({
+                ...c,
+                industry: c.industry || "",
+                asset_size: c.asset_size || "",
+                listing_status: c.listing_status || "",
+                business_report: c.business_report || "",
+                gaap: c.gaap || "",
+                consolidated: c.consolidated || "",
+                subsidiary_count: c.subsidiary_count || "",
+                internal_control: c.internal_control || "",
+                initial_audit: c.initial_audit || "",
+              });
             }
           }}
           onClose={() => setShowClientSearch(false)}
@@ -1408,19 +1429,19 @@ function Step1Form({
                 );
                 if (r.ok) {
                   const info = await r.json();
-                  const base = client; // snapshot before async — existing user input wins
-                  setClient({
-                    ...base,
-                    industry: base.industry || info.industry || "",
-                    asset_size: base.asset_size || info.asset_size || "",
-                    listing_status: base.listing_status || info.listing_status || "",
-                    business_report: base.business_report || info.business_report || "",
-                    gaap: base.gaap || info.gaap || "",
-                    consolidated: base.consolidated || info.consolidated || "",
-                    subsidiary_count: base.subsidiary_count || info.subsidiary_count || "",
-                    internal_control: base.internal_control || info.internal_control || "",
-                    initial_audit: base.initial_audit || info.initial_audit || "",
-                  });
+                  setClient((prev) => ({
+                    ...prev,
+                    client_code: code,
+                    industry: info.industry || "",
+                    asset_size: info.asset_size || "",
+                    listing_status: info.listing_status || "",
+                    business_report: info.business_report || "",
+                    gaap: info.gaap || "",
+                    consolidated: info.consolidated || "",
+                    subsidiary_count: info.subsidiary_count || "",
+                    internal_control: info.internal_control || "",
+                    initial_audit: info.initial_audit || "",
+                  }));
                 }
               } catch {
                 /* silent fail — client info autofill is best-effort */
