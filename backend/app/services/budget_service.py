@@ -9,6 +9,7 @@ from app.models.project import Client, Project
 from app.models.budget import BudgetDetail
 from app.services import azure_service
 from app.services.budget_category_map import get_category
+from app.services.budget_definitions import display_budget, axdx_excluded_budget
 
 logger = logging.getLogger(__name__)
 
@@ -370,8 +371,16 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                 "el_name": p.el_name,
                 "pm_name": p.pm_name,
                 "template_status": p.template_status or "",
-                "budget": float(p.contract_hours or 0),
+                # POL-01 (b): display_budget = contract_hours − axdx_hours
+                "budget": display_budget(p, view="overview_project_table_budget"),
+                "contract_hours": float(p.contract_hours or 0),
                 "actual": float(actual_map.get(p.project_code, 0)),
+                # real_progress: actual / display_budget (AX/DX 제외 기준)
+                "real_progress": round(
+                    float(actual_map.get(p.project_code, 0)) /
+                    display_budget(p, view="overview_project_table_budget") * 100, 1
+                ) if axdx_excluded_budget(p) > 0 else 0,
+                # progress: actual / contract_hours (전통적 KPI 기준)
                 "progress": round(
                     float(actual_map.get(p.project_code, 0)) /
                     float(p.contract_hours or 1) * 100, 1

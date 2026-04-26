@@ -67,15 +67,28 @@ class TestBudgetActualConsistency:
                 print(f"⚠️  {proj['project_name']}: progress={progress}% — Budget/Actual scope 불일치 가능")
 
     def test_kpi_total_consistency(self, client, elpm_cookie):
-        """KPI 총 계약시간과 프로젝트별 Budget 합계가 일치하는지."""
+        """POL-01 (b) 적용 후: project table budget = KPI contract - KPI axdx.
+
+        영역 6 POL-01 (b) 결정: project table 의 budget 컬럼은 axdx_excluded_budget
+        (= contract_hours - axdx_hours). KPI contract_hours 는 총 계약시간 합계.
+        둘은 더 이상 같지 않으며, 차이가 axdx 합계와 일치해야 한다.
+        """
         res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
         proj_budget_sum = sum(p["budget"] for p in data["projects"])
+        proj_contract_sum = sum(p.get("contract_hours", 0) for p in data["projects"])
         kpi_contract = data["kpi"]["contract_hours"]
+        kpi_axdx = data["kpi"].get("axdx_hours", 0)
 
-        assert abs(proj_budget_sum - kpi_contract) < 1, (
-            f"KPI contract_hours={kpi_contract}, project budget sum={proj_budget_sum}"
+        # KPI 총 계약시간 = sum of project contract_hours (변화 없음)
+        assert abs(proj_contract_sum - kpi_contract) < 1, (
+            f"KPI contract_hours={kpi_contract}, project contract sum={proj_contract_sum}"
+        )
+        # POL-01 (b): project budget sum = KPI contract - KPI axdx
+        assert abs(proj_budget_sum - (kpi_contract - kpi_axdx)) < 1, (
+            f"POL-01 (b) violation: project budget sum={proj_budget_sum}, "
+            f"expected (KPI contract - axdx) = {kpi_contract - kpi_axdx}"
         )
 
 
