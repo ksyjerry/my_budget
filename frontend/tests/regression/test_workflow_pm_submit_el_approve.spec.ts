@@ -7,6 +7,9 @@ const PROJECT = "AREA2-LIST-P1";  // seeded by Task 2 backend test
 
 test.describe("regression #61 #98 — POL-04 워크플로우 PM submit → EL approve", () => {
   test("PM submits, EL approves, EL can unlock", async ({ page }) => {
+    // Accept all native confirm() dialogs automatically
+    page.on("dialog", (dialog) => dialog.accept());
+
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', PM);
     await page.click('button[type="submit"]');
