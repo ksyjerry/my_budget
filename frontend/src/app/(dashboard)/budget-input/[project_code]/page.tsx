@@ -793,7 +793,8 @@ export default function BudgetWizardPage() {
             onCloneFromProject={async (sourceCode: string) => {
               try {
                 const res = await fetch(
-                  `${API_BASE}/api/v1/budget/projects/${sourceCode}/clone-data`
+                  `${API_BASE}/api/v1/budget/projects/${sourceCode}/clone-data`,
+                  { credentials: "include" }
                 );
                 if (!res.ok) throw new Error("Failed");
                 const data = await res.json();
