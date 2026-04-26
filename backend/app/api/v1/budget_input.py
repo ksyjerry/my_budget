@@ -1063,6 +1063,43 @@ def save_template(
     return {"message": f"Budget Template 저장 완료 ({len(details)}건)"}
 
 
+@router.post("/projects/{project_code}/template/reset")
+def reset_template(
+    project_code: str,
+    user: dict = Depends(require_elpm),
+    db: Session = Depends(get_db),
+):
+    """Step 3 Budget Template 초기화 — 모든 budget_details 삭제.
+
+    #115/#116: 프론트엔드 state 초기화만으로는 DB가 지워지지 않는 문제 해결.
+    이 엔드포인트를 호출해야 서버 측 데이터가 완전히 초기화된다.
+
+    정책 (POL-#91 — 중복 인원):
+    budget_details는 (project_code, budget_unit, empno, year_month) 인덱스를 사용하며
+    UNIQUE 제약 없이 여러 담당자(empno)가 동일 관리단위에 배정될 수 있다.
+    즉, 1 관리단위 = N 담당자 정책이 기본값이다.
+    """
+    assert_can_modify_project(db, user, project_code)
+
+    deleted = db.query(BudgetDetail).filter(
+        BudgetDetail.project_code == project_code
+    ).delete(synchronize_session=False)
+
+    # Reset template_status to 작성중
+    project = db.query(Project).filter(Project.project_code == project_code).first()
+    if project:
+        project.template_status = "작성중"
+
+    db.add(BudgetChangeLog(
+        project_code=project_code,
+        change_type="update",
+        change_summary=f"Budget Template 초기화 ({deleted}건 삭제)",
+    ))
+    db.commit()
+
+    return {"message": f"Budget Template 초기화 완료 ({deleted}건 삭제)", "deleted_count": deleted}
+
+
 # ── 마스터 데이터 ────────────────────────────────────
 
 @router.get("/master/units")
