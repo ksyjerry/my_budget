@@ -1823,7 +1823,7 @@ function EmployeeSearch({
   onSelect: (name: string, empno: string, grade?: string) => void;
 }) {
   const [query, setQuery] = useState(value);
-  const [results, setResults] = useState<{ empno: string; name: string; grade: string; emp_status?: string }[]>([]);
+  const [results, setResults] = useState<{ empno: string; name: string; grade: string; team_name?: string; department?: string; emp_status?: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -1904,7 +1904,12 @@ function EmployeeSearch({
               }}
             >
               <span>{r.name}<span className="text-pwc-gray-600 ml-1">({r.empno})</span></span>
-              <span className="text-xs text-pwc-gray-600">{r.grade}</span>
+              <span className="text-xs text-pwc-gray-600 flex gap-2">
+                <span>{r.grade}</span>
+                {(r.team_name || r.department) && (
+                  <span className="text-pwc-gray-600">{r.team_name || r.department}</span>
+                )}
+              </span>
             </div>
           ))}
         </div>
@@ -2022,12 +2027,50 @@ function Step2Members({
       <section>
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
           <h3 className="text-sm font-bold text-pwc-black">FLDT 구성원</h3>
-          <button
-            onClick={() => addMember("FLDT 구성원")}
-            className="px-3 py-1 text-xs font-medium border border-pwc-black rounded hover:bg-pwc-black hover:text-white transition-colors"
-          >
-            + 구성원 추가
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => addMember("FLDT 구성원")}
+              className="px-3 py-1 text-xs font-medium border border-pwc-black rounded hover:bg-pwc-black hover:text-white transition-colors"
+            >
+              + 구성원 추가
+            </button>
+            <button
+              onClick={() => {
+                setMembers((prev) => [
+                  ...prev,
+                  { role: "FLDT 구성원", name: "TBD", empno: "", grade: "", activity_mapping: "재무제표기말감사", sort_order: prev.length },
+                ]);
+              }}
+              className="px-2 py-1 text-xs font-medium border border-pwc-gray-200 rounded hover:bg-pwc-gray-50 text-pwc-gray-900 transition-colors"
+              title="미정 구성원 (TBD) 추가"
+            >
+              + TBD
+            </button>
+            <button
+              onClick={() => {
+                setMembers((prev) => [
+                  ...prev,
+                  { role: "FLDT 구성원", name: "NS", empno: "", grade: "", activity_mapping: "재무제표기말감사", sort_order: prev.length },
+                ]);
+              }}
+              className="px-2 py-1 text-xs font-medium border border-pwc-gray-200 rounded hover:bg-pwc-gray-50 text-pwc-gray-900 transition-colors"
+              title="New Step 구성원 추가"
+            >
+              + NS
+            </button>
+            <button
+              onClick={() => {
+                setMembers((prev) => [
+                  ...prev,
+                  { role: "FLDT 구성원", name: "Associate", empno: "", grade: "", activity_mapping: "재무제표기말감사", sort_order: prev.length },
+                ]);
+              }}
+              className="px-2 py-1 text-xs font-medium border border-pwc-gray-200 rounded hover:bg-pwc-gray-50 text-pwc-gray-900 transition-colors"
+              title="Associate 구성원 추가"
+            >
+              + Associate
+            </button>
+          </div>
         </div>
         {fldtMembers.length === 0 ? (
           <p className="text-xs text-pwc-gray-600 py-4 text-center">
@@ -2157,16 +2200,19 @@ function Step2Members({
                       {i + 1}
                     </td>
                     <td className="px-3 py-1.5">
-                      <input
-                        type="text"
+                      <select
                         value={m.name}
                         onChange={(e) => {
                           updateMember(idx, "name", e.target.value);
                           updateMember(idx, "empno", e.target.value);
                         }}
-                        placeholder="Fulcrum, RA, Specialist 등"
                         className="w-full px-2 py-1 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
-                      />
+                      >
+                        <option value="">(선택)</option>
+                        <option value="Fulcrum">Fulcrum</option>
+                        <option value="RA-Staff">RA-Staff</option>
+                        <option value="Specialist">Specialist</option>
+                      </select>
                     </td>
                     <td className="px-3 py-1.5 text-xs text-pwc-gray-600">
                       {m.grade || "-"}
