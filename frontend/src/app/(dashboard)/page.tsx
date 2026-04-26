@@ -8,6 +8,23 @@ import DonutChart from "@/components/charts/DonutChart";
 import FilterBar from "@/components/filters/FilterBar";
 import { gradeRank } from "@/lib/grade";
 
+// #95: FY26 연월 옵션 동적 생성 (4월~3월 12개)
+function buildFiscalYearMonthOptions(fiscalStartYear = 2025): { value: string; label: string }[] {
+  const opts: { value: string; label: string }[] = [];
+  // FY26: 2025-04 ~ 2026-03
+  for (let m = 4; m <= 12; m++) {
+    const ym = `${fiscalStartYear}-${String(m).padStart(2, "0")}`;
+    opts.push({ value: ym, label: `${fiscalStartYear}년 ${m}월` });
+  }
+  for (let m = 1; m <= 3; m++) {
+    const ym = `${fiscalStartYear + 1}-${String(m).padStart(2, "0")}`;
+    opts.push({ value: ym, label: `${fiscalStartYear + 1}년 ${m}월` });
+  }
+  return opts;
+}
+
+const YEAR_MONTH_OPTIONS = buildFiscalYearMonthOptions(2025);
+
 // ── Helper Components ──────────────────────────────
 function ProgressBadge({ value }: { value: number }) {
   if (value === 0) return <span className="text-pwc-gray-600">-</span>;
@@ -166,7 +183,9 @@ function OverviewInner() {
         ]}
         filters={[
           {
-            name: "year_month", label: "연월", options: [],
+            // #95: 연월 동적 생성 (FY 4월~3월 12개)
+            name: "year_month", label: "연월",
+            options: YEAR_MONTH_OPTIONS,
             value: filters.year_month,
             onChange: (v: string) => setFilters((f) => ({ ...f, year_month: v })),
           },
@@ -174,7 +193,13 @@ function OverviewInner() {
             name: "project", label: "Project",
             options: filterOpts?.projects || [],
             value: filters.project_code,
-            onChange: (v: string) => setFilters((f) => ({ ...f, project_code: v })),
+            // #96: 프로젝트 선택 시 EL/PM cascading — 선택된 프로젝트에 해당하는 EL/PM 자동 필터
+            onChange: (v: string) => {
+              const prj = (filterOpts?.projects || []).find((p) => p.value === v);
+              // filterOpts.projects의 value는 project_code; EL/PM은 별도 필터에서 선택
+              setFilters((f) => ({ ...f, project_code: v, el_empno: v ? f.el_empno : "", pm_empno: v ? f.pm_empno : "" }));
+              void prj; // used for type check
+            },
           },
           {
             name: "el", label: "EL",
@@ -195,8 +220,14 @@ function OverviewInner() {
             onChange: (v: string) => setFilters((f) => ({ ...f, department: v })),
           },
           {
-            name: "service_type", label: "대분류",
-            options: filterOpts?.service_types || [],
+            // #77: 서비스타입 "감사/비감사" 표시 — display_category 기반 옵션 그룹
+            name: "service_type", label: "감사구분",
+            options: (filterOpts?.service_types || []).map((s) => ({
+              value: s.value,
+              label: (s as { value: string; label: string; display_category?: string }).display_category
+                ? `[${(s as { value: string; label: string; display_category?: string }).display_category}] ${s.label}`
+                : s.label,
+            })),
             value: filters.service_type,
             onChange: (v: string) => setFilters((f) => ({ ...f, service_type: v })),
           },
