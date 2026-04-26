@@ -210,11 +210,16 @@ def get_filter_options(
             depts_set.add(p.department)
 
     # #50 service_type options — DB 실사용 값만 노출
+    # #77: display_category 추가 ("감사" | "비감사") — 프론트에서 그룹 필터링 지원
     from app.api.v1.budget_input import SERVICE_TYPES
     name_by_code = {s["code"]: s["name"] for s in SERVICE_TYPES}
     used_codes = sorted({p.service_type for p in all_projects if p.service_type})
     service_types_list = [
-        {"value": c, "label": name_by_code.get(c, c)}
+        {
+            "value": c,
+            "label": name_by_code.get(c, c),
+            "display_category": "감사" if c == "AUDIT" else "비감사",
+        }
         for c in used_codes
     ]
 
