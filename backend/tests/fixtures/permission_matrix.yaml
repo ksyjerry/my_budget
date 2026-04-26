@@ -1,4 +1,6 @@
-# Permission matrix for all 23 write (POST/PUT/DELETE/PATCH) endpoints.
+# Permission matrix for write (POST/PUT/DELETE/PATCH) endpoints and key GET
+# endpoints that require non-trivial auth (partner_access_config, public).
+# Originally 23 write endpoints; tracking GET endpoints added for POL-08 (b).
 #
 # Guard legend:
 #   require_admin  → only admin allowed; elpm/staff → 403; anon → 401
@@ -236,3 +238,33 @@
     elpm: 403
     staff: 403
     anon: 401
+
+- method: GET
+  path: /api/v1/tracking/projects
+  guards: [partner_access_config]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+# Note: GET /tracking/projects/{project_code} is tested in test_tracking_permission_pol08.py.
+# Not included here because its 403 is data-scoping (project not in allowed list),
+# which cannot be distinguished from an auth 403 without seeding project data.
+- method: GET
+  path: /api/v1/tracking/filter-options
+  guards: [partner_access_config]
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 403
+    anon: 401
+
+- method: GET
+  path: /api/v1/tracking/access
+  guards: []
+  expected:
+    admin: 200
+    elpm: 200
+    staff: 200
+    anon: 200
