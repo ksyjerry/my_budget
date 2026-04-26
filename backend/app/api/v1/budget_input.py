@@ -1348,10 +1348,14 @@ async def upload_project_members(
 
 
 @router.get("/template/blank-export")
-def export_blank_budget_template(user: dict = Depends(require_login)):
-    """비활성 상태에서도 받을 수 있는 빈 Budget Template Excel."""
+def export_blank_budget_template(db: Session = Depends(get_db), user: dict = Depends(require_login)):
+    """비활성 상태에서도 받을 수 있는 빈 Budget Template Excel.
+    #119: budget_unit 열에 드롭다운 DataValidation 추가 (hidden sheet + named range 방식).
+    """
     import datetime as _dt
     from openpyxl import Workbook
+    from openpyxl.worksheet.datavalidation import DataValidation
+    from openpyxl.utils import quote_sheetname
 
     wb = Workbook()
     ws = wb.active
@@ -1364,6 +1368,44 @@ def export_blank_budget_template(user: dict = Depends(require_login)):
         months.append(f"{y}-{m:02d}")
     headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
     ws.append(headers)
+    # Pre-populate 100 blank data rows so validation applies immediately
+    for _ in range(100):
+        ws.append([""] * len(headers))
+
+    # #119: build budget_unit dropdown via hidden sheet + named range
+    # (formula1 direct list is limited to 255 chars; named range avoids this)
+    unit_names: list[str] = []
+    try:
+        master_units = (
+            db.query(BudgetUnitMaster)
+            .order_by(BudgetUnitMaster.sort_order)
+            .all()
+        )
+        unit_names = [u.unit_name for u in master_units if u.unit_name]
+    except Exception:
+        pass  # DB unavailable — skip validation, template still usable
+
+    if unit_names:
+        # Write units to a hidden sheet
+        ws_lists = wb.create_sheet("_lists")
+        ws_lists.sheet_state = "hidden"
+        for i, name in enumerate(unit_names, start=1):
+            ws_lists.cell(row=i, column=1, value=name)
+        # Define a named range pointing to the lists sheet column A
+        last_row = len(unit_names)
+        ref = f"{quote_sheetname('_lists')}!$A$1:$A${last_row}"
+        from openpyxl.workbook.defined_name import DefinedName
+        dn = DefinedName("BudgetUnitList", attr_text=ref)
+        wb.defined_names.add(dn)
+        # Add DataValidation for column B (budget_unit), rows 2–101
+        dv = DataValidation(
+            type="list",
+            formula1="BudgetUnitList",
+            allow_blank=True,
+            showErrorMessage=False,
+        )
+        dv.sqref = "B2:B101"
+        ws.add_data_validation(dv)
 
     buf = io.BytesIO()
     wb.save(buf)

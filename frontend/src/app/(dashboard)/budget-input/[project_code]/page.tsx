@@ -48,6 +48,7 @@ interface ProjectInfo {
   template_status: string;
   service_type: string;
   fiscal_start?: string | null;
+  fiscal_end?: string | null;
 }
 
 interface ClientInfo {
@@ -877,6 +878,8 @@ export default function BudgetWizardPage() {
             clientInfo={client}
             months={MONTHS}
             monthLabels={MONTH_LABELS}
+            fiscalEnd={project.fiscal_end ?? null}
+            onFiscalEndChange={(val) => setProject({ ...project, fiscal_end: val })}
             onTemplateImported={async () => {
               const code = project.project_code || projectCode;
               if (!code || code === "new") return;
@@ -2268,6 +2271,8 @@ function Step3Template({
   months: MONTHS,
   monthLabels: MONTH_LABELS,
   onTemplateImported,
+  fiscalEnd,
+  onFiscalEndChange,
 }: {
   rows: TemplateRow[];
   setRows: (rows: TemplateRow[]) => void;
@@ -2285,6 +2290,8 @@ function Step3Template({
   months: string[];
   monthLabels: string[];
   onTemplateImported?: () => Promise<void>;
+  fiscalEnd?: string | null;
+  onFiscalEndChange?: (val: string | null) => void;
 }) {
   const [viewMode, setViewMode] = useState<"month" | "quarter">("month");
   const QUARTERS = useMemo(() => {
@@ -2302,6 +2309,7 @@ function Step3Template({
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{ type: "suggest" | "validate"; data: Record<string, unknown> } | null>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
   // Excel-like grid state
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
@@ -2354,7 +2362,17 @@ function Step3Template({
     }
   };
 
+  // #111 frontend sanitize safety net — strip host/IP from user-facing messages
+  const sanitizeMsg = (s: string) =>
+    s
+      .replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?/g, "[host]")
+      .replace(/localhost(:\d+)?/gi, "[host]");
+
   const handleAiValidate = async () => {
+    // #110 abort previous in-flight request if any
+    aiAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     setAiLoading(true);
     setAiResult(null);
     try {
@@ -2362,6 +2380,7 @@ function Step3Template({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           project_code: projectCode,
           et_controllable: etControllable,
@@ -2376,12 +2395,13 @@ function Step3Template({
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ detail: "AI 검증 실패" }));
-        throw new Error(errData.detail || "AI 검증 실패");
+        throw new Error(sanitizeMsg(errData.detail || "AI 검증 실패"));
       }
       const data = await res.json();
       setAiResult({ type: "validate", data });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "AI 검증 오류");
+      if (e instanceof Error && e.name === "AbortError") return;
+      alert(e instanceof Error ? sanitizeMsg(e.message) : "AI 검증 오류");
     } finally {
       setAiLoading(false);
     }
@@ -2673,11 +2693,45 @@ function Step3Template({
           </svg>
           {aiLoading ? "검증 중..." : "AI 검증"}
         </button>
-        <div className="flex-1" />
+        {/* Group C — #112 #113: 전체 V 토글 */}
         <button
           type="button"
           onClick={() => {
+            const allEnabled = rows.every((r) => r.enabled);
+            setRows(rows.map((r) => ({ ...r, enabled: !allEnabled })));
+          }}
+          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-lg hover:bg-pwc-gray-50 text-pwc-gray-900"
+        >
+          전체 V {rows.every((r) => r.enabled) ? "해제" : "체크"}
+        </button>
+        {/* Group G — #118: 종료월 입력 (POL-07(c)) */}
+        {onFiscalEndChange && (
+          <label className="flex items-center gap-1 text-xs text-pwc-gray-600">
+            종료월:
+            <input
+              type="month"
+              value={fiscalEnd ? fiscalEnd.substring(0, 7) : ""}
+              onChange={(e) =>
+                onFiscalEndChange(e.target.value ? `${e.target.value}-01` : null)
+              }
+              className="ml-1 px-2 py-1 text-xs border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+            />
+          </label>
+        )}
+        <div className="flex-1" />
+        {/* Group B — #115 #116: 초기화 (frontend + backend reset) */}
+        <button
+          type="button"
+          onClick={async () => {
             if (!confirm("Time Budget 의 모든 입력값을 초기화 합니다. 계속하시겠습니까?")) return;
+            try {
+              await fetch(
+                `${API_BASE}/api/v1/budget/projects/${projectCode}/template/reset`,
+                { method: "POST", credentials: "include" }
+              );
+            } catch {
+              // best-effort; reset frontend state regardless
+            }
             setRows(rows.map((r) => ({
               ...r,
               enabled: false,
@@ -2690,6 +2744,27 @@ function Step3Template({
           className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-lg hover:bg-pwc-gray-50 text-pwc-gray-900"
         >
           🔄 초기화
+        </button>
+        {/* Group H — #104: 빈 Template 다운로드 */}
+        <button
+          type="button"
+          onClick={async () => {
+            const res = await fetch(
+              `${API_BASE}/api/v1/budget/template/blank-export`,
+              { credentials: "include" }
+            );
+            if (!res.ok) { alert("빈 Template 다운로드 실패"); return; }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "budget_template_blank.xlsx";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
+        >
+          📥 빈 Template
         </button>
         <button
           type="button"
@@ -3043,7 +3118,7 @@ function Step3Template({
             })}
             {/* Totals row */}
             <tr className="border-t-2 border-pwc-black bg-pwc-gray-100 font-bold">
-              <td colSpan={4} className="px-2 py-2 text-right">
+              <td colSpan={5} className="px-2 py-2 text-right">
                 합계
               </td>
               <td className="px-2 py-2 text-right">
