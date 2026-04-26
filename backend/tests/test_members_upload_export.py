@@ -48,7 +48,7 @@ def test_export_returns_xlsx_content_type(client, elpm_cookie):
     assert "spreadsheetml.sheet" in r.headers.get("content-type", "")
     wb = load_workbook(io.BytesIO(r.content))
     ws = wb.active
-    assert [c.value for c in ws[1]] == ["empno", "name", "role", "grade"]
+    assert [c.value for c in ws[1]] == ["사번", "이름", "역할", "직급", "팀"]
 
 
 def test_upload_replaces_fldt_members(client, elpm_cookie):
