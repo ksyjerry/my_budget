@@ -1,5 +1,6 @@
 """Budget 입력 API (3-Step Wizard)."""
 import io
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -702,11 +703,13 @@ def export_project_members(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    # #78: RFC 5987 UTF-8 인코딩으로 한글 파일명 브라우저 호환성 보장
+    fn_members = quote(f"members_{project_code}.xlsx")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f'attachment; filename="members_{project_code}.xlsx"',
+            "Content-Disposition": f"attachment; filename*=UTF-8''{fn_members}",
         },
     )
 
@@ -868,10 +871,12 @@ def export_project_template(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    # #78: RFC 5987 UTF-8 인코딩
+    fn_template = quote(f"template_{project_code}.xlsx")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="template_{project_code}.xlsx"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn_template}"},
     )
 
 
@@ -1410,8 +1415,10 @@ def export_blank_budget_template(db: Session = Depends(get_db), user: dict = Dep
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    # #78: RFC 5987 UTF-8 인코딩
+    fn_blank = quote("budget_template_blank.xlsx")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="budget_template_blank.xlsx"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn_blank}"},
     )
