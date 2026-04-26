@@ -175,6 +175,7 @@ def search_employees(
             "name": e.name,
             "grade": e.grade_name or "",
             "department": e.department or "",
+            "team_name": e.department or "",  # team_name fallback = department (no separate teams join)
             "emp_status": e.emp_status or "",
         }
         for e in rows
@@ -672,6 +673,7 @@ def export_project_members(
     sub-path match.
     """
     from openpyxl import Workbook
+    from app.models.employee import Employee
 
     members = (
         db.query(ProjectMember)
@@ -680,12 +682,20 @@ def export_project_members(
         .all()
     )
 
+    # Build empno → department lookup for team column
+    empnos = [m.empno for m in members if m.empno]
+    emp_dept: dict[str, str] = {}
+    if empnos:
+        emps = db.query(Employee).filter(Employee.empno.in_(empnos)).all()
+        emp_dept = {e.empno: (e.department or "") for e in emps}
+
     wb = Workbook()
     ws = wb.active
     ws.title = "구성원"
-    ws.append(["empno", "name", "role", "grade"])
+    ws.append(["사번", "이름", "역할", "직급", "팀"])
     for m in members:
-        ws.append([m.empno or "", m.name or "", m.role or "FLDT", m.grade or ""])
+        dept = emp_dept.get(m.empno or "", "")
+        ws.append([m.empno or "", m.name or "", m.role or "FLDT", m.grade or "", dept])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1160,32 +1170,42 @@ async def upload_project_members(
 
     imported: list[dict] = []
     skipped: list[dict] = []
+    errors: list[dict] = []
     for idx, row in enumerate(rows):
+        row_num = idx + 2  # Excel row number (1-indexed header + 1)
         if not row or not any(c is not None for c in row):
             continue
         empno = str(row[0]).strip() if row[0] else ""
         name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
         role = str(row[2]).strip() if len(row) > 2 and row[2] else "FLDT"
-        grade = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+        # #73: 직급/팀 columns are optional — lookup from employees master if missing
+        grade = str(row[3]).strip() if len(row) > 3 and row[3] else None
 
         if not empno:
-            skipped.append({"row": idx + 2, "reason": "empno missing"})
+            # #87: accumulate errors per-row, do not stop
+            errors.append({"row": row_num, "col": "사번", "error": "사번 누락"})
+            skipped.append({"row": row_num, "reason": "empno missing"})
             continue
 
         emp = db.query(Employee).filter(Employee.empno == empno).first()
         if emp is None:
+            errors.append({"row": row_num, "col": "사번", "error": f"사번 {empno} 직원 없음"})
             skipped.append({"empno": empno, "reason": "not_found"})
             continue
         if emp.emp_status and emp.emp_status != "재직":
+            errors.append({"row": row_num, "col": "사번", "error": f"사번 {empno} 재직 아님 ({emp.emp_status})"})
             skipped.append({"empno": empno, "reason": "inactive"})
             continue
+
+        # #73: fill grade from employees master if column missing
+        resolved_grade = grade or (emp.grade_name or "")
 
         db.add(ProjectMember(
             project_code=project_code,
             role=role,
             name=name or emp.name,
             empno=empno,
-            grade=grade or (emp.grade_name or ""),
+            grade=resolved_grade,
             sort_order=idx,
         ))
         imported.append({"empno": empno, "name": name or emp.name})
@@ -1195,6 +1215,7 @@ async def upload_project_members(
         "imported_count": len(imported),
         "imported": imported,
         "skipped": skipped,
+        "errors": errors,
     }
 
 
