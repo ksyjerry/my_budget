@@ -357,13 +357,25 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
 
 
 @router.get("/projects/{project_code}/clone-data")
-def get_clone_data(project_code: str, db: Session = Depends(get_db)):
-    """이전 프로젝트 정보 가져오기 — 시간, 구성원, budget template 전체 반환."""
+def get_clone_data(
+    project_code: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_login),
+):
+    """이전 프로젝트 정보 가져오기 — 시간, 구성원, budget template 전체 반환.
+
+    Lookup: project_code first; if not found, try matching project_name (계속감사 케이스
+    에서 사용자가 회사명으로 검색하는 경우 지원).
+    """
     from collections import defaultdict
 
     proj = db.query(Project).filter(Project.project_code == project_code).first()
     if not proj:
-        from fastapi import HTTPException
+        # Fallback: try project_name match (case-insensitive partial)
+        proj = db.query(Project).filter(
+            Project.project_name.ilike(f"%{project_code}%")
+        ).first()
+    if not proj:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
 
     # 시간 정보
