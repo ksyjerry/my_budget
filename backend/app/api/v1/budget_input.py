@@ -184,19 +184,46 @@ def search_employees(
 @router.get("/projects/list")
 def list_registered_projects(
     q: str = "",
+    status: str = "",
     db: Session = Depends(get_db),
     user: Optional[dict] = Depends(get_optional_user),
 ):
-    """Budget 등록된 프로젝트 목록 — 로그인 사용자가 EL인 프로젝트만."""
-    from sqlalchemy import func as sa_func
+    """Budget 등록된 프로젝트 목록.
+
+    가시성:
+    - admin (role=admin, scope=all): 전체
+    - elpm: el_empno OR pm_empno == 본인 empno
+    - 비로그인: 빈 리스트
+    필터:
+    - q: project_name 또는 project_code 부분 검색 (ILIKE)
+    - status: template_status 정확 일치 (작성중 / 작성완료 / 승인완료)
+    """
+    from sqlalchemy import func as sa_func, or_
+
+    if not user:
+        return []
+
     query = db.query(Project)
-    if user:
-        query = query.filter(Project.el_empno == user["empno"])
+
+    # 가시성 필터
+    if user.get("role") == "admin" and user.get("scope") == "all":
+        pass  # 전체 노출
+    else:
+        empno = user["empno"]
+        query = query.filter(or_(
+            Project.el_empno == empno,
+            Project.pm_empno == empno,
+        ))
+
     if q:
-        query = query.filter(
-            (Project.project_name.ilike(f"%{q}%")) |
-            (Project.project_code.ilike(f"%{q}%"))
-        )
+        query = query.filter(or_(
+            Project.project_name.ilike(f"%{q}%"),
+            Project.project_code.ilike(f"%{q}%"),
+        ))
+
+    if status:
+        query = query.filter(Project.template_status == status)
+
     projects = query.order_by(Project.contract_hours.desc().nullslast()).all()
     result = []
     for p in projects:
@@ -211,6 +238,7 @@ def list_registered_projects(
             "total_budget_hours": float(p.total_budget_hours or 0),
             "template_status": p.template_status or "작성중",
             "member_count": member_count,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
         })
     return result
 
