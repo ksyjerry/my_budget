@@ -481,6 +481,7 @@ class ProjectCreateRequest(BaseModel):
     total_budget_hours: float = 0
     template_status: Optional[str] = "작성중"
     fiscal_start: Optional[str] = None  # "2025-04"
+    fiscal_end: Optional[str] = None    # "2026-03" — #118: 시작 자동+끝 수동 (미입력 시 fiscal_start+12개월)
     service_type: Optional[str] = "AUDIT"
 
 
@@ -637,6 +638,7 @@ def get_project_info(project_code: str, db: Session = Depends(get_db)):
             "template_status": project.template_status,
             "service_type": project.service_type or "AUDIT",
             "fiscal_start": project.fiscal_start.isoformat() if project.fiscal_start else None,
+            "fiscal_end": project.fiscal_end.isoformat() if project.fiscal_end else None,
         },
         "client": {
             "client_code": client.client_code if client else "",
@@ -760,15 +762,60 @@ def save_members(
 # Note: export/upload registered before plain /template so FastAPI does not
 # swallow `template/export` as a {project_code} sub-path match.
 
+def _build_12_months(fiscal_start) -> list[str]:
+    """Return a list of 12 YYYY-MM strings starting from fiscal_start (date or 'YYYY-MM' str)."""
+    import datetime as _dt
+    if fiscal_start is None:
+        # Default: April of current year (common audit fiscal year)
+        base_year = _dt.datetime.now().year
+        start_year, start_month = base_year, 4
+    elif isinstance(fiscal_start, str):
+        parts = fiscal_start.split("-")
+        start_year, start_month = int(parts[0]), int(parts[1])
+    else:
+        # date object
+        start_year, start_month = fiscal_start.year, fiscal_start.month
+    months = []
+    for i in range(12):
+        m = ((start_month - 1 + i) % 12) + 1
+        y = start_year + ((start_month - 1 + i) // 12)
+        months.append(f"{y}-{m:02d}")
+    return months
+
+
 @router.get("/projects/{project_code}/template/export")
 def export_project_template(
     project_code: str,
     user: dict = Depends(require_login),
     db: Session = Depends(get_db),
 ):
-    """Step 3 Time Budget Excel 다운로드."""
+    """Step 3 Time Budget Excel 다운로드.
+
+    #106: All 12 months always written (0 if no data).
+    #117: Rows sorted by budget_unit_master.sort_order then unit_name.
+    #75/#105: Reads latest committed state via fresh query.
+    """
     from openpyxl import Workbook
     from app.models.budget import BudgetDetail
+
+    # Refresh read from DB (#75/#105 — ensure latest committed state)
+    db.expire_all()
+
+    project = db.query(Project).filter(Project.project_code == project_code).first()
+
+    # Build 12-month column list from project's fiscal_start (#106)
+    fiscal_start = project.fiscal_start if project else None
+    months = _build_12_months(fiscal_start)
+
+    # Build sort_order lookup from BudgetUnitMaster (#117)
+    unit_sort: dict[str, int] = {}
+    master_rows = db.query(BudgetUnitMaster).order_by(BudgetUnitMaster.sort_order).all()
+    for m in master_rows:
+        unit_sort[m.unit_name] = m.sort_order
+    # Fallback sort_order for unknown units using DEFAULT_BUDGET_UNITS
+    for du in DEFAULT_BUDGET_UNITS:
+        if du["unit_name"] not in unit_sort:
+            unit_sort[du["unit_name"]] = du["sort_order"]
 
     rows = (
         db.query(BudgetDetail)
@@ -782,28 +829,40 @@ def export_project_template(
         .all()
     )
 
-    months: list[str] = sorted({r.year_month for r in rows if r.year_month})
     pivot: dict[tuple, dict] = {}
     name_by_empno: dict[str, str] = {}
     grade_by_empno: dict[str, str] = {}
+    # Track insertion order for re-sorting later
+    key_order: list[tuple] = []
     for r in rows:
         key = (r.budget_category or "", r.budget_unit or "", r.empno or "")
-        pivot.setdefault(key, {})
+        if key not in pivot:
+            pivot[key] = {}
+            key_order.append(key)
         pivot[key][r.year_month] = (pivot[key].get(r.year_month) or 0) + (r.budget_hours or 0)
         if r.emp_name:
             name_by_empno[r.empno or ""] = r.emp_name
         if r.grade:
             grade_by_empno[r.empno or ""] = r.grade
 
+    # Sort rows by sort_order then unit_name (#117)
+    key_order_sorted = sorted(
+        key_order,
+        key=lambda k: (unit_sort.get(k[1], 9999), k[1], k[2]),
+    )
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Time Budget"
+    # #106: All 12 months always present as columns
     headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
     ws.append(headers)
-    for (cat, unit, emp), month_hours in pivot.items():
+    for key in key_order_sorted:
+        (cat, unit, emp) = key
+        month_hours = pivot[key]
         row_data = [cat, unit, emp, name_by_empno.get(emp, ""), grade_by_empno.get(emp, "")]
         for m in months:
-            row_data.append(month_hours.get(m, 0))
+            row_data.append(month_hours.get(m, 0))  # 0 if no data for that month
         ws.append(row_data)
 
     buf = io.BytesIO()
@@ -823,7 +882,11 @@ async def upload_project_template(
     user: dict = Depends(require_elpm),
     db: Session = Depends(get_db),
 ):
-    """Step 3 Time Budget Excel 업로드 — 기존 budget_details truncate+insert."""
+    """Step 3 Time Budget Excel 업로드 — merge 방식 (업로드된 행만 교체, 나머지 보존).
+
+    #107/#114: 업로드 파일의 (budget_unit, empno) 조합에 해당하는 기존 rows만 삭제 후
+    재삽입. 파일에 없는 rows는 삭제하지 않아 부분 업로드 후에도 나머지 데이터 보존.
+    """
     from openpyxl import load_workbook
     from app.models.budget import BudgetDetail
     from app.api.deps import assert_can_modify_project
@@ -852,12 +915,8 @@ async def upload_project_template(
     if base_cols["budget_unit"] == -1:
         raise HTTPException(status_code=400, detail="헤더에 budget_unit 컬럼이 필요합니다.")
 
-    db.query(BudgetDetail).filter(BudgetDetail.project_code == project_code).delete(
-        synchronize_session=False
-    )
-    db.commit()
-
-    imported = 0
+    # Parse uploaded rows to identify which (unit, empno) keys are being replaced
+    parsed_rows: list[dict] = []
     skipped: list[dict] = []
     for ridx, row in enumerate(rows[1:], start=2):
         if not row or not any(c is not None for c in row):
@@ -870,21 +929,44 @@ async def upload_project_template(
         if not unit:
             skipped.append({"row": ridx, "reason": "budget_unit missing"})
             continue
+        month_hours: dict[str, float] = {}
         for col_idx, year_month in month_cols:
             cell = row[col_idx] if col_idx < len(row) else None
             try:
                 hours = float(cell or 0)
             except (TypeError, ValueError):
                 hours = 0
-            if hours == 0:
-                continue
+            if hours > 0:
+                month_hours[year_month] = hours
+        parsed_rows.append({
+            "budget_category": cat,
+            "budget_unit": unit,
+            "empno": empno,
+            "emp_name": name,
+            "grade": grade,
+            "months": month_hours,
+        })
+
+    # Merge: delete only the (budget_unit, empno) combos present in the upload file
+    # This preserves rows not included in the upload (#107/#114)
+    uploaded_keys: set[tuple[str, str]] = {(r["budget_unit"], r["empno"]) for r in parsed_rows}
+    for unit, empno in uploaded_keys:
+        db.query(BudgetDetail).filter(
+            BudgetDetail.project_code == project_code,
+            BudgetDetail.budget_unit == unit,
+            BudgetDetail.empno == empno,
+        ).delete(synchronize_session=False)
+
+    imported = 0
+    for prow in parsed_rows:
+        for year_month, hours in prow["months"].items():
             db.add(BudgetDetail(
                 project_code=project_code,
-                budget_category=cat,
-                budget_unit=unit,
-                empno=empno,
-                emp_name=name,
-                grade=grade,
+                budget_category=prow["budget_category"],
+                budget_unit=prow["budget_unit"],
+                empno=prow["empno"],
+                emp_name=prow["emp_name"],
+                grade=prow["grade"],
                 year_month=year_month,
                 budget_hours=hours,
             ))
@@ -896,7 +978,12 @@ async def upload_project_template(
 
 @router.get("/projects/{project_code}/template")
 def get_template(project_code: str, db: Session = Depends(get_db)):
-    """Budget Template 조회."""
+    """Budget Template 조회.
+
+    #118: month_range 반환 — fiscal_start..fiscal_end (12개월).
+    프론트엔드는 이 범위를 기준으로 월별 입력 컬럼을 렌더링한다.
+    """
+    project = db.query(Project).filter(Project.project_code == project_code).first()
     details = (
         db.query(BudgetDetail)
         .filter(BudgetDetail.project_code == project_code)
@@ -928,7 +1015,11 @@ def get_template(project_code: str, db: Session = Depends(get_db)):
             "total": total,
         })
 
-    return {"project_code": project_code, "rows": rows}
+    # Build month range for frontend column rendering (#118)
+    fiscal_start = project.fiscal_start if project else None
+    month_range = _build_12_months(fiscal_start)
+
+    return {"project_code": project_code, "rows": rows, "month_range": month_range}
 
 
 @router.put("/projects/{project_code}/template")
