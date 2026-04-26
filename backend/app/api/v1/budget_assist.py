@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.api.deps import require_login
 from app.models.project import Project
 from app.models.budget import BudgetDetail
+from app.services.error_sanitize import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -228,7 +229,7 @@ async def suggest_budget(
         logger.error(f"Budget suggest LLM error: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=f"AI 추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+            detail=sanitize_error_message(f"AI 추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__}: {e})"),
         )
 
     elapsed = int((time.time() - t0) * 1000)
@@ -327,7 +328,7 @@ async def validate_budget(
         logger.error(f"Budget validate LLM error: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=f"AI 검증에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+            detail=sanitize_error_message(f"AI 검증에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__}: {e})"),
         )
 
     elapsed = int((time.time() - t0) * 1000)
