@@ -59,11 +59,13 @@ export default function BudgetInputPage() {
     }
   };
 
+  const lc = search.toLowerCase();
   const filtered = allProjects.filter(
     (p) =>
-      p.project_name.includes(search) ||
-      p.project_code.includes(search) ||
-      p.el_name.includes(search)
+      p.project_name.toLowerCase().includes(lc) ||
+      p.project_code.toLowerCase().includes(lc) ||
+      p.el_name.toLowerCase().includes(lc) ||
+      p.pm_name.toLowerCase().includes(lc)
   );
 
 
