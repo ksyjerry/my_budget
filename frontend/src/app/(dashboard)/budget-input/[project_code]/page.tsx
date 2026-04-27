@@ -27,6 +27,7 @@ import type {
   BudgetUnit,
   TemplateRow,
 } from "./types";
+import { sanitizeMsg, computeStep3Errors } from "./lib/wizard-validators";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -367,37 +368,7 @@ export default function BudgetWizardPage() {
   const saveAll = async (status: string) => {
     if (status === "작성완료") {
       const enabledRows = templateRows.filter((r) => r.enabled);
-      const errors: string[] = [];
-
-      const noEmpno = enabledRows.filter((r) => !r.empno);
-      if (noEmpno.length > 0) {
-        errors.push(
-          `담당자 미지정 ${noEmpno.length}건:\n` +
-            noEmpno
-              .slice(0, 5)
-              .map((r) => `  - ${r.budget_unit ?? ""}`)
-              .join("\n") +
-            (noEmpno.length > 5 ? `\n  ...외 ${noEmpno.length - 5}건` : "")
-        );
-      }
-
-      const noHours = enabledRows.filter((r) =>
-        Object.values(r.months ?? {}).every((h) => !h || h === 0)
-      );
-      if (noHours.length > 0) {
-        errors.push(`시간 미입력 ${noHours.length}건`);
-      }
-
-      const totalSum = enabledRows.reduce(
-        (s, r) => s + Object.values(r.months ?? {}).reduce((a, b) => a + (b || 0), 0),
-        0
-      );
-      if (Math.abs(totalSum - etControllable) > 0.01) {
-        errors.push(
-          `시간 합계 ${totalSum.toLocaleString()} ≠ ET Controllable ${etControllable.toLocaleString()} (차이: ${(totalSum - etControllable).toFixed(1)}h)`
-        );
-      }
-
+      const errors = computeStep3Errors(enabledRows, etControllable);
       if (errors.length > 0) {
         alert("등록완료 전 확인이 필요합니다:\n\n" + errors.join("\n\n"));
         return;
@@ -2297,12 +2268,6 @@ function Step3Template({
       setAiLoading(false);
     }
   };
-
-  // #111 frontend sanitize safety net — strip host/IP from user-facing messages
-  const sanitizeMsg = (s: string) =>
-    s
-      .replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?/g, "[host]")
-      .replace(/localhost(:\d+)?/gi, "[host]");
 
   const handleAiValidate = async () => {
     // #110 abort previous in-flight request if any
