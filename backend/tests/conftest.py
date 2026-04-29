@@ -9,6 +9,7 @@ from app.main import app
 from app.db.session import SessionLocal
 from app.core.sessions import SESSION_COOKIE_NAME, create_session
 from app.models.session import Session as DBSession
+from app.models.employee import Employee
 
 
 @pytest.fixture(scope="session")
@@ -21,6 +22,27 @@ def db():
     session = SessionLocal()
     yield session
     session.close()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _seed_test_employees():
+    """Seed Employee rows for fixture empnos so sessions FK constraint passes.
+
+    Idempotent: skip if already present (CI: empty DB / dev: real employee sync)."""
+    s = SessionLocal()
+    try:
+        seeds = [
+            ("170661", "최성우"),
+            ("320915", "지해나"),
+            ("160553", "관리자"),
+        ]
+        for empno, name in seeds:
+            if s.query(Employee).filter(Employee.empno == empno).first() is None:
+                s.add(Employee(empno=empno, name=name, emp_status="재직"))
+        s.commit()
+    finally:
+        s.close()
+    yield
 
 
 def _ensure_session(empno: str, role: str, scope: str = "self") -> str:
