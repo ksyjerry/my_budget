@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
@@ -15,6 +16,12 @@ from app.models.budget_master import (
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# DATABASE_URL 환경변수가 설정되어 있으면 alembic.ini 의 sqlalchemy.url 를 override.
+# CI / Docker / production 환경에서는 환경변수 우선, local dev 는 alembic.ini fallback.
+_db_url = os.environ.get("DATABASE_URL")
+if _db_url:
+    config.set_main_option("sqlalchemy.url", _db_url)
 
 target_metadata = Base.metadata
 
