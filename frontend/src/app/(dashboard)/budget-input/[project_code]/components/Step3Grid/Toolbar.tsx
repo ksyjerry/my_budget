@@ -16,6 +16,12 @@ interface ToolbarProps {
   onFiscalEndChange?: (val: string | null) => void;
   categories: string[];
   budgetUnits: BudgetUnit[];
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
+  collapsedCount: number;
+  totalCategoryCount: number;
   // action handlers
   onAiSuggest: () => void;
   onAiValidate: () => void;
@@ -38,6 +44,12 @@ export function Toolbar({
   fiscalEnd,
   onFiscalEndChange,
   categories,
+  searchQuery,
+  onSearchChange,
+  onExpandAll,
+  onCollapseAll,
+  collapsedCount,
+  totalCategoryCount,
   onAiSuggest,
   onAiValidate,
   onReset,
@@ -123,6 +135,34 @@ export function Toolbar({
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-pwc-black text-pwc-black rounded-lg hover:bg-pwc-gray-50 transition-all"
         >
           📊 분배 도우미
+        </button>
+
+        {/* Search input */}
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="검색 (대분류/관리단위/담당자)"
+          className="px-3 py-1 text-xs border border-pwc-gray-200 rounded w-56"
+        />
+
+        {/* Expand/Collapse all */}
+        <button
+          type="button"
+          onClick={onExpandAll}
+          disabled={collapsedCount === 0}
+          className="px-2 py-1 text-xs border border-pwc-gray-200 rounded hover:bg-pwc-gray-50 disabled:opacity-40"
+          title={`접힌 대분류 ${collapsedCount}개 펼치기`}
+        >
+          ▼ 전체 펼침
+        </button>
+        <button
+          type="button"
+          onClick={onCollapseAll}
+          disabled={collapsedCount === totalCategoryCount}
+          className="px-2 py-1 text-xs border border-pwc-gray-200 rounded hover:bg-pwc-gray-50 disabled:opacity-40"
+        >
+          ▶ 전체 접힘
         </button>
 
         {/* 전체 V 토글 */}

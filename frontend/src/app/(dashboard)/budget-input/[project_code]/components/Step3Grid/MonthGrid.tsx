@@ -31,6 +31,8 @@ interface MonthGridProps {
   updateRowAssignee: (idx: number, empno: string, name: string, grade: string) => void;
   duplicateRow: (idx: number) => void;
   rowTotal: (row: TemplateRow) => number;
+  collapsedCategories: Set<string>;
+  onToggleCategory: (category: string) => void;
 }
 
 // Column index constants
@@ -57,6 +59,8 @@ export function MonthGrid({
   updateRowAssignee,
   duplicateRow,
   rowTotal,
+  collapsedCategories,
+  onToggleCategory,
 }: MonthGridProps) {
   const gridRef = useRef<HTMLTableElement>(null);
 
@@ -246,10 +250,32 @@ export function MonthGrid({
                 </td>
                 {/* 대분류 — sticky left col 1 */}
                 <td
-                  className="sticky left-[32px] z-10 px-2 py-0.5 text-pwc-gray-500 border-r border-b border-pwc-gray-100 truncate bg-white"
-                  title={row.budget_category}
+                  className={`sticky left-[32px] z-10 px-2 py-0.5 text-pwc-gray-500 border-r border-b border-pwc-gray-100 truncate bg-white ${
+                    showCategory ? "cursor-pointer hover:bg-pwc-gray-50 font-medium" : ""
+                  }`}
+                  title={
+                    showCategory
+                      ? `${row.budget_category} — 클릭하여 ${
+                          collapsedCategories.has(row.budget_category) ? "펼치기" : "접기"
+                        }`
+                      : row.budget_category
+                  }
+                  onClick={
+                    showCategory
+                      ? () => onToggleCategory(row.budget_category)
+                      : undefined
+                  }
                 >
-                  {showCategory ? row.budget_category : ""}
+                  {showCategory ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-pwc-gray-400 text-[10px]">
+                        {collapsedCategories.has(row.budget_category) ? "▶" : "▼"}
+                      </span>
+                      {row.budget_category}
+                    </span>
+                  ) : (
+                    ""
+                  )}
                 </td>
                 {/* 관리단위 — sticky left col 2 */}
                 <td className="sticky left-[132px] z-10 border-r border-b border-pwc-gray-100 px-0.5 py-0.5 bg-white">

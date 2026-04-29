@@ -188,6 +188,68 @@ export function Step3Grid({
     [budgetUnits]
   );
 
+  // ── Search + collapse state (sessionStorage persisted) ─────
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return sessionStorage.getItem("step3-search") || "";
+  });
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    () => {
+      if (typeof window === "undefined") return new Set<string>();
+      try {
+        const saved = sessionStorage.getItem("step3-collapsed");
+        return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
+      } catch {
+        return new Set<string>();
+      }
+    }
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem("step3-search", searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(
+      "step3-collapsed",
+      JSON.stringify(Array.from(collapsedCategories))
+    );
+  }, [collapsedCategories]);
+
+  const toggleCategory = useCallback((category: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  }, []);
+
+  const expandAllCategories = useCallback(() => {
+    setCollapsedCategories(new Set());
+  }, []);
+
+  const collapseAllCategories = useCallback(() => {
+    setCollapsedCategories(new Set(categories));
+  }, [categories]);
+
+  const visibleIndices = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return sortedIndices.filter((idx) => {
+      const row = rows[idx];
+      if (collapsedCategories.has(row.budget_category)) return false;
+      if (!q) return true;
+      return (
+        row.budget_category.toLowerCase().includes(q) ||
+        row.budget_unit.toLowerCase().includes(q) ||
+        (row.emp_name || "").toLowerCase().includes(q) ||
+        (row.empno || "").toLowerCase().includes(q)
+      );
+    });
+  }, [sortedIndices, rows, searchQuery, collapsedCategories]);
+
   // ── Add-row handler ─────────────────────────────────
   const addNewRow = () => {
     if (!newRowCategory || !newRowUnit) return;
@@ -230,6 +292,12 @@ export function Step3Grid({
         onFiscalEndChange={onFiscalEndChange}
         categories={categories}
         budgetUnits={budgetUnits}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onExpandAll={expandAllCategories}
+        onCollapseAll={collapseAllCategories}
+        collapsedCount={collapsedCategories.size}
+        totalCategoryCount={categories.length}
         onAiSuggest={handleAiSuggest}
         onAiValidate={handleAiValidate}
         onReset={() => handleReset(rows)}
@@ -261,7 +329,7 @@ export function Step3Grid({
       <MonthGrid
         rows={rows}
         setRows={setRowsArray}
-        sortedIndices={sortedIndices}
+        sortedIndices={visibleIndices}
         months={MONTHS}
         monthLabels={MONTH_LABELS}
         quarters={QUARTERS}
@@ -278,6 +346,8 @@ export function Step3Grid({
         updateRowAssignee={updateRowAssignee}
         duplicateRow={duplicateRow}
         rowTotal={rowTotal}
+        collapsedCategories={collapsedCategories}
+        onToggleCategory={toggleCategory}
       />
 
       {/* Distribution Helper Modal */}
