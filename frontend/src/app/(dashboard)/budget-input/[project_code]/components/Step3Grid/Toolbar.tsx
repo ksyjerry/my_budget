@@ -19,9 +19,6 @@ interface ToolbarProps {
   // action handlers
   onAiSuggest: () => void;
   onAiValidate: () => void;
-  onExportTemplate: () => void;
-  onExportBlankTemplate: () => void;
-  onImportTemplate: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onReset: () => void;
   onApplyAiSuggestions: () => void;
   onDismissAiResult: () => void;
@@ -42,9 +39,6 @@ export function Toolbar({
   categories,
   onAiSuggest,
   onAiValidate,
-  onExportTemplate,
-  onExportBlankTemplate,
-  onImportTemplate,
   onReset,
   onApplyAiSuggestions,
   onDismissAiResult,
@@ -159,33 +153,6 @@ export function Toolbar({
         >
           🔄 초기화
         </button>
-
-        {/* 빈 Template 다운로드 */}
-        <button
-          type="button"
-          onClick={onExportBlankTemplate}
-          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
-        >
-          📥 빈 Template
-        </button>
-
-        <button
-          type="button"
-          onClick={onExportTemplate}
-          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
-        >
-          📥 Excel 다운로드
-        </button>
-
-        <label className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900 cursor-pointer">
-          📤 Excel 업로드
-          <input
-            type="file"
-            accept=".xlsx"
-            className="hidden"
-            onChange={onImportTemplate}
-          />
-        </label>
 
         <button
           disabled={categories.length === 0}

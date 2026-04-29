@@ -384,19 +384,6 @@ export default function BudgetWizardPage() {
             monthLabels={MONTH_LABELS}
             fiscalEnd={project.fiscal_end ?? null}
             onFiscalEndChange={(val) => setProject({ ...project, fiscal_end: val })}
-            onTemplateImported={async () => {
-              const code = project.project_code || projectCode;
-              if (!code || code === "new") return;
-              const r = await fetch(`${API_BASE}/api/v1/budget/projects/${code}/template`);
-              if (r.ok) {
-                const data = await r.json();
-                if (data?.rows?.length) {
-                  setTemplateRows(
-                    data.rows.map((row: TemplateRow) => ({ ...row, enabled: true }))
-                  );
-                }
-              }
-            }}
           />
         )}
       </div>

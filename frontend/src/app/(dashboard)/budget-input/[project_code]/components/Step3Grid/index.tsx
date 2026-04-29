@@ -8,7 +8,7 @@ import type {
   ClientInfo,
 } from "../../types";
 import { useAiAssist } from "../../hooks/useAiAssist";
-import { useStep3Roundtrip } from "../../hooks/useStep3Roundtrip";
+import { useStep3Reset } from "../../hooks/useStep3Reset";
 import { SummaryRow } from "./SummaryRow";
 import { Toolbar } from "./Toolbar";
 import { AddRowModal } from "./AddRowModal";
@@ -35,7 +35,6 @@ interface Step3GridProps {
   clientInfo: ClientInfo;
   months: string[];
   monthLabels: string[];
-  onTemplateImported?: () => Promise<void>;
   fiscalEnd?: string | null;
   onFiscalEndChange?: (val: string | null) => void;
 }
@@ -56,7 +55,6 @@ export function Step3Grid({
   clientInfo,
   months: MONTHS,
   monthLabels: MONTH_LABELS,
-  onTemplateImported,
   fiscalEnd,
   onFiscalEndChange,
 }: Step3GridProps) {
@@ -79,13 +77,11 @@ export function Step3Grid({
   const [newRowUnit, setNewRowUnit] = useState("");
 
   // ── Hooks ───────────────────────────────────────────
-  const { handleExportTemplate, handleExportBlankTemplate, handleImportTemplate, handleReset } =
-    useStep3Roundtrip({
-      projectCode,
-      months: MONTHS,
-      setRows,
-      onTemplateImported,
-    });
+  const { handleReset } = useStep3Reset({
+    projectCode,
+    months: MONTHS,
+    setRows,
+  });
 
   const {
     aiLoading,
@@ -189,9 +185,6 @@ export function Step3Grid({
         budgetUnits={budgetUnits}
         onAiSuggest={handleAiSuggest}
         onAiValidate={handleAiValidate}
-        onExportTemplate={handleExportTemplate}
-        onExportBlankTemplate={handleExportBlankTemplate}
-        onImportTemplate={handleImportTemplate}
         onReset={() => handleReset(rows)}
         onApplyAiSuggestions={applyAiSuggestions}
         onDismissAiResult={dismissAiResult}
