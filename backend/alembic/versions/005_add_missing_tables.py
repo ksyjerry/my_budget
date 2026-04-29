@@ -37,6 +37,13 @@ def upgrade() -> None:
     conn = op.get_bind()
     insp = sa.inspect(conn)
 
+    # ---------- projects.service_type (model declared, migration missing) ----------
+    if insp.has_table("projects") and not _has_column(insp, "projects", "service_type"):
+        op.add_column(
+            "projects",
+            sa.Column("service_type", sa.String(20), nullable=False, server_default="AUDIT"),
+        )
+
     # ---------- service_task_master ----------
     if not insp.has_table("service_task_master"):
         op.create_table(
