@@ -8,6 +8,7 @@ test.describe("regression #69 — project search works without client selection"
     await page.goto(`${FRONTEND}/login`);
     await page.fill('input[placeholder="사번을 입력하세요"]', EL);
     await page.click('button[type="submit"]');
+    await page.waitForURL((url) => !url.toString().includes("/login"));
     await page.goto(`${FRONTEND}/budget-input/new`);
     await page.waitForLoadState("networkidle");
 

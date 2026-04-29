@@ -785,13 +785,35 @@ def _ensure_project_cache():
             _project_cache = []
 
 
-def search_azure_projects(q: str, limit: int = 50, client_code_prefix: str = "") -> list[dict]:
-    """Azure 캐시에서 프로젝트 검색. client_code_prefix가 있으면 코드 앞자리 필터."""
+def _normalize_client_name(name: str) -> str:
+    return (name or "").replace("(주)", "").replace("주식회사", "").replace(" ", "").lower()
+
+
+def search_azure_projects(
+    q: str,
+    limit: int = 50,
+    client_code_prefix: str = "",
+    client_name: str = "",
+) -> list[dict]:
+    """Azure 캐시에서 프로젝트 검색.
+
+    필터 우선순위:
+    1) client_name 이 있으면 client_name 정규화 매칭 (legal entity client_code 와
+       project_code prefix 가 다른 코드 체계인 환경에서 정확)
+    2) 그 외 client_code_prefix 가 있으면 project_code 앞자리 매칭 (legacy)
+    """
     _ensure_project_cache()
     pool = _project_cache or []
 
-    # client_code_prefix로 먼저 필터
-    if client_code_prefix:
+    if client_name:
+        target = _normalize_client_name(client_name)
+        if target:
+            pool = [
+                p
+                for p in pool
+                if target in _normalize_client_name(p.get("client_name") or "")
+            ]
+    elif client_code_prefix:
         prefix = client_code_prefix[:5]
         pool = [p for p in pool if (p["project_code"] or "").startswith(prefix)]
 

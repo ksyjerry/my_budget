@@ -312,114 +312,33 @@ export function Step1Form({
         />
       )}
 
-      {/* 프로젝트 정보 */}
+      {/* 1. 서비스 분류 */}
       <section>
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
-          <h3 className="text-sm font-bold text-pwc-black">
-            프로젝트 정보
-          </h3>
-          {isNew && (
-            <button
-              type="button"
-              onClick={() => setShowProjectSearch(true)}
-              className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
-            >
-              프로젝트 검색
-            </button>
-          )}
+          <h3 className="text-sm font-bold text-pwc-black">서비스 분류</h3>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              서비스 분류 <span className="text-pwc-red">*</span>
-            </label>
-            <select
-              value={project.service_type}
-              onChange={(e) => pField("service_type", e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
-            >
-              <option value="AUDIT">감사</option>
-              <option value="AC">회계자문</option>
-              <option value="IC">내부통제 (C.SOX PA)</option>
-              <option value="ESG">ESG</option>
-              <option value="VAL">Valuation</option>
-              <option value="TRADE">통상자문</option>
-              <option value="ACT">보험계리</option>
-              <option value="ETC">기타</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              Project Code
-            </label>
-            <input
-              type="text"
-              value={project.project_code}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600 font-mono"
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              프로젝트명
-            </label>
-            <input
-              type="text"
-              value={project.project_name}
-              readOnly
-              placeholder="프로젝트명"
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              본부명
-            </label>
-            <input
-              type="text"
-              value={project.department}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              EL
-            </label>
-            <input
-              type="text"
-              value={project.el_name ? `${project.el_name}(${project.el_empno})` : ""}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              PM
-            </label>
-            <input
-              type="text"
-              value={project.pm_name ? `${project.pm_name}(${project.pm_empno})` : ""}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              QRP
-            </label>
-            <input
-              type="text"
-              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : project.qrp_empno}
-              onChange={(e) => pField("qrp_empno", e.target.value)}
-              placeholder="QRP 사번 입력 또는 검색"
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
-            />
-          </div>
+        <div className="max-w-xs">
+          <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+            서비스 분류 <span className="text-pwc-red">*</span>
+          </label>
+          <select
+            value={project.service_type}
+            onChange={(e) => pField("service_type", e.target.value)}
+            className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+          >
+            <option value="AUDIT">감사</option>
+            <option value="AC">회계자문</option>
+            <option value="IC">내부통제 (C.SOX PA)</option>
+            <option value="ESG">ESG</option>
+            <option value="VAL">Valuation</option>
+            <option value="TRADE">통상자문</option>
+            <option value="ACT">보험계리</option>
+            <option value="ETC">기타</option>
+          </select>
         </div>
       </section>
 
-      {/* 클라이언트 기본정보 */}
+      {/* 2. 클라이언트 기본정보 */}
       <section>
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
           <h3 className="text-sm font-bold text-pwc-black">
@@ -529,6 +448,94 @@ export function Step1Form({
               onChange={(v) => cField("initial_audit", v)}
             />
           )}
+        </div>
+      </section>
+
+      {/* 3. 프로젝트 정보 */}
+      <section>
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
+          <h3 className="text-sm font-bold text-pwc-black">
+            프로젝트 정보
+          </h3>
+          {isNew && (
+            <button
+              type="button"
+              onClick={() => setShowProjectSearch(true)}
+              className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
+            >
+              프로젝트 검색
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              Project Code
+            </label>
+            <input
+              type="text"
+              value={project.project_code}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600 font-mono"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              프로젝트명
+            </label>
+            <input
+              type="text"
+              value={project.project_name}
+              readOnly
+              placeholder="프로젝트명"
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              본부명
+            </label>
+            <input
+              type="text"
+              value={project.department}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              EL
+            </label>
+            <input
+              type="text"
+              value={project.el_name ? `${project.el_name}(${project.el_empno})` : ""}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              PM
+            </label>
+            <input
+              type="text"
+              value={project.pm_name ? `${project.pm_name}(${project.pm_empno})` : ""}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              QRP
+            </label>
+            <input
+              type="text"
+              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : project.qrp_empno}
+              onChange={(e) => pField("qrp_empno", e.target.value)}
+              placeholder="QRP 사번 입력 또는 검색"
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+            />
+          </div>
         </div>
       </section>
 

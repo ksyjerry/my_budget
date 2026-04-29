@@ -248,15 +248,25 @@ def list_registered_projects(
 @router.get("/projects/search")
 def search_projects(q: str = "", client_code: str = "", db: Session = Depends(get_db)):
     """프로젝트 검색 — Azure DB(회사 전체) + PostgreSQL(Budget 등록 여부) 병합.
-    client_code가 주어지면 해당 클라이언트(프로젝트코드 앞 5자리)에 종속된 프로젝트만 반환.
-    Azure 연결 불가 시 PostgreSQL에 등록된 프로젝트를 fallback으로 반환.
+
+    client_code 가 주어지면 해당 클라이언트의 프로젝트만 반환.
+    legal entity client_code (예: 05319 삼성전자) 와 project_code 앞 5자리 (예: 00435)
+    가 서로 다른 코드 체계이므로, client_code → client_name 으로 변환 후 name-match 사용.
     """
     from app.services import azure_service
 
-    # 1) Azure에서 회사 전체 진행 중 프로젝트 검색
-    #    client_code가 있으면 해당 클라이언트의 프로젝트만 필터
+    # client_code → client_name 해석 (legal entity 코드를 Azure project name 매칭에 사용)
+    client_name = ""
+    client_id: int | None = None
+    if client_code:
+        c = db.query(Client).filter(Client.client_code == client_code).first()
+        if c:
+            client_name = (c.client_name or "").strip()
+            client_id = c.id
+
+    # 1) Azure에서 회사 전체 진행 중 프로젝트 검색 — client_name 으로 필터
     azure_results = azure_service.search_azure_projects(
-        q, limit=200, client_code_prefix=client_code
+        q, limit=200, client_name=client_name, client_code_prefix=client_code
     )
 
     def _pg_extra(p: "Project") -> dict:
@@ -321,7 +331,9 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
     # 3b) Azure 결과 없음 (연결 불가 or 필터 결과 0건) → PG 등록 프로젝트 fallback
     #     client_code 필터 적용, q로 검색 (case-insensitive)
     pg_query = db.query(Project)
-    if client_code:
+    if client_id is not None:
+        pg_query = pg_query.filter(Project.client_id == client_id)
+    elif client_code:
         prefix = client_code[:5]
         pg_query = pg_query.filter(Project.project_code.ilike(f"{prefix}%"))
     if q:
@@ -332,8 +344,7 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
         )
     fallback_projects = pg_query.order_by(Project.project_code).limit(200).all()
 
-    # Also load client names via join
-    from app.models.project import Client
+    # Also load client names via join (Client already imported at module top)
     client_map: dict[int, str] = {}
     client_ids = [p.client_id for p in fallback_projects if p.client_id]
     if client_ids:
