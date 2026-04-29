@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import type {
   TemplateRow,
   Member,
@@ -13,6 +13,9 @@ import { SummaryRow } from "./SummaryRow";
 import { Toolbar } from "./Toolbar";
 import { AddRowModal } from "./AddRowModal";
 import { MonthGrid } from "./MonthGrid";
+import { DistributionHelper } from "./DistributionHelper";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 interface Step3GridProps {
   rows: TemplateRow[];
@@ -75,6 +78,50 @@ export function Step3Grid({
   const [showAddRow, setShowAddRow] = useState(false);
   const [newRowCategory, setNewRowCategory] = useState("");
   const [newRowUnit, setNewRowUnit] = useState("");
+
+  // ── Distribution helper state ───────────────────────
+  const [showDistHelper, setShowDistHelper] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+  const [peerGroup, setPeerGroup] = useState<string | null>(null);
+
+  // ── Peer group fetch ────────────────────────────────
+  useEffect(() => {
+    if (!clientInfo.industry || !clientInfo.asset_size) return;
+    const params = new URLSearchParams({
+      industry: clientInfo.industry,
+      asset_size: clientInfo.asset_size,
+      listing_status: clientInfo.listing_status || "",
+      consolidated: clientInfo.consolidated || "",
+      internal_control: clientInfo.internal_control || "",
+    });
+    fetch(`${API_BASE}/api/v1/budget/peer-group?${params}`, {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setPeerGroup(data?.stat_group || null))
+      .catch(() => {});
+  }, [
+    clientInfo.industry,
+    clientInfo.asset_size,
+    clientInfo.listing_status,
+    clientInfo.consolidated,
+    clientInfo.internal_control,
+  ]);
+
+  // ── Apply distribution changes ──────────────────────
+  const applyDistributionChanges = useCallback(
+    (changes: Map<string, Record<string, number>>) => {
+      setRows((prev) =>
+        prev.map((row) => {
+          const key = `${row.budget_category}|${row.budget_unit}|${row.empno}`;
+          const newMonths = changes.get(key);
+          if (!newMonths) return row;
+          return { ...row, months: { ...row.months, ...newMonths } };
+        })
+      );
+    },
+    [setRows]
+  );
 
   // ── Hooks ───────────────────────────────────────────
   const { handleReset } = useStep3Reset({
@@ -189,6 +236,7 @@ export function Step3Grid({
         onApplyAiSuggestions={applyAiSuggestions}
         onDismissAiResult={dismissAiResult}
         onShowAddRow={() => setShowAddRow(true)}
+        onOpenDistributionHelper={() => setShowDistHelper(true)}
       />
 
       {/* Add Row Modal */}
@@ -230,6 +278,18 @@ export function Step3Grid({
         updateRowAssignee={updateRowAssignee}
         duplicateRow={duplicateRow}
         rowTotal={rowTotal}
+      />
+
+      {/* Distribution Helper Modal */}
+      <DistributionHelper
+        open={showDistHelper}
+        onClose={() => setShowDistHelper(false)}
+        templateRows={rows}
+        selectedRowKeys={selectedRowKeys}
+        monthRange={MONTHS}
+        peerGroup={peerGroup}
+        baseHours={etControllable}
+        onApply={applyDistributionChanges}
       />
     </div>
   );

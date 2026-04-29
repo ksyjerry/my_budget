@@ -23,6 +23,7 @@ interface ToolbarProps {
   onApplyAiSuggestions: () => void;
   onDismissAiResult: () => void;
   onShowAddRow: () => void;
+  onOpenDistributionHelper: () => void;
 }
 
 export function Toolbar({
@@ -43,6 +44,7 @@ export function Toolbar({
   onApplyAiSuggestions,
   onDismissAiResult,
   onShowAddRow,
+  onOpenDistributionHelper,
 }: ToolbarProps) {
   return (
     <>
@@ -114,6 +116,13 @@ export function Toolbar({
             />
           </svg>
           {aiLoading ? "검증 중..." : "AI 검증"}
+        </button>
+
+        <button
+          onClick={onOpenDistributionHelper}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-pwc-black text-pwc-black rounded-lg hover:bg-pwc-gray-50 transition-all"
+        >
+          📊 분배 도우미
         </button>
 
         {/* 전체 V 토글 */}
