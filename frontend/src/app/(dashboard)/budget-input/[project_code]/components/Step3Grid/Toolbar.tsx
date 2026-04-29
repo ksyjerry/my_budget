@@ -165,18 +165,6 @@ export function Toolbar({
           ▶ 전체 접힘
         </button>
 
-        {/* 전체 V 토글 */}
-        <button
-          type="button"
-          onClick={() => {
-            const allEnabled = rows.every((r) => r.enabled);
-            setRows(rows.map((r) => ({ ...r, enabled: !allEnabled })));
-          }}
-          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-lg hover:bg-pwc-gray-50 text-pwc-gray-900"
-        >
-          전체 V {rows.every((r) => r.enabled) ? "해제" : "체크"}
-        </button>
-
         {/* 종료월 입력 */}
         {onFiscalEndChange && (
           <label className="flex items-center gap-1 text-xs text-pwc-gray-600">

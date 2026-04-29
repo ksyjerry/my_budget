@@ -170,9 +170,24 @@ export function MonthGrid({
         </colgroup>
         <thead className="sticky top-0 z-20 shadow-sm">
           <tr className="border-b border-pwc-gray-200">
-            {/* 해당 — sticky left col 0 (left: 0, width 32) */}
+            {/* 해당 — sticky left col 0 (left: 0, width 32) — 마스터 V 토글 */}
             <th className="sticky left-0 z-30 bg-pwc-gray-50 px-1 py-2 text-center font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 32 }}>
-              <span title="해당">V</span>
+              <input
+                type="checkbox"
+                title="전체 V 토글"
+                checked={rows.length > 0 && rows.every((r) => r.enabled)}
+                ref={(el) => {
+                  if (!el) return;
+                  const allOn = rows.length > 0 && rows.every((r) => r.enabled);
+                  const someOn = rows.some((r) => r.enabled);
+                  el.indeterminate = !allOn && someOn;
+                }}
+                onChange={() => {
+                  const allEnabled = rows.every((r) => r.enabled);
+                  setRows(rows.map((r) => ({ ...r, enabled: !allEnabled })));
+                }}
+                className="accent-pwc-orange cursor-pointer"
+              />
             </th>
             {/* 대분류 — sticky left col 1 (left: 32, width 100) */}
             <th className="sticky left-[32px] z-30 bg-pwc-gray-50 px-2 py-2 text-left font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 100 }}>
