@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { gradeRank } from "@/lib/grade";
 import { NumberField } from "@/components/ui/NumberField";
 import type { TemplateRow, Member, BudgetUnit } from "../../types";
+import { getCellValidationClass } from "../../lib/wizard-validators";
 
 interface Quarter {
   label: string;
@@ -224,6 +225,8 @@ export function MonthGrid({
             const total = rowTotal(row);
             const currentVisualRow = visualRowIdx;
             visualRowIdx++;
+            const empnoValidationClass = getCellValidationClass(row, "empno");
+            const totalValidationClass = getCellValidationClass(row, "hours-total");
 
             return (
               <tr
@@ -292,7 +295,7 @@ export function MonthGrid({
                     activeCell?.col === FIRST_EDITABLE_COL
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                       : "bg-white"
-                  }`}
+                  } ${empnoValidationClass}`}
                   onClick={() =>
                     row.enabled &&
                     handleCellClick(currentVisualRow, FIRST_EDITABLE_COL)
@@ -352,7 +355,7 @@ export function MonthGrid({
                     ""}
                 </td>
                 {/* 합계 — sticky right */}
-                <td className="sticky right-0 z-10 px-2 py-0.5 text-right font-bold border-l border-b border-pwc-gray-200 bg-pwc-gray-50">
+                <td className={`sticky right-0 z-10 px-2 py-0.5 text-right font-bold border-l border-b border-pwc-gray-200 bg-pwc-gray-50 ${totalValidationClass}`}>
                   {total > 0 ? total : ""}
                 </td>
                 {/* 월별 셀 */}
