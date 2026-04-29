@@ -145,10 +145,10 @@ export function MonthGrid({
   let visualRowIdx = 0;
 
   return (
-    <div className="overflow-x-auto border border-pwc-gray-200 rounded-lg shadow-sm pb-24">
+    <div className="overflow-auto max-h-[70vh] border border-pwc-gray-200 rounded-lg shadow-sm pb-24">
       <table
         ref={gridRef}
-        className="w-full text-xs whitespace-nowrap border-collapse select-none"
+        className="w-full text-xs whitespace-nowrap border-separate border-spacing-0 select-none"
         style={{ tableLayout: "fixed" }}
       >
         <colgroup>
@@ -163,31 +163,37 @@ export function MonthGrid({
             : QUARTERS.map((q) => <col key={q.label} style={{ width: 72 }} />)}
           <col style={{ width: 56 }} />
         </colgroup>
-        <thead className="bg-pwc-gray-50 sticky top-0 z-10">
+        <thead className="sticky top-0 z-20 shadow-sm">
           <tr className="border-b border-pwc-gray-200">
-            <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">
+            {/* 해당 — sticky left col 0 (left: 0, width 32) */}
+            <th className="sticky left-0 z-30 bg-pwc-gray-50 px-1 py-2 text-center font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 32 }}>
               <span title="해당">V</span>
             </th>
-            <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">
+            {/* 대분류 — sticky left col 1 (left: 32, width 100) */}
+            <th className="sticky left-[32px] z-30 bg-pwc-gray-50 px-2 py-2 text-left font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 100 }}>
               대분류
             </th>
-            <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">
+            {/* 관리단위 — sticky left col 2 (left: 132, width 180) */}
+            <th className="sticky left-[132px] z-30 bg-pwc-gray-50 px-2 py-2 text-left font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 180 }}>
               Budget 관리단위
             </th>
-            <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">
+            {/* 담당자 — sticky left col 3 (left: 312, width 140) */}
+            <th className="sticky left-[312px] z-30 bg-pwc-gray-50 px-2 py-2 text-left font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200" style={{ minWidth: 140 }}>
               담당자
             </th>
-            <th className="px-2 py-2 text-left font-semibold text-pwc-gray-600">
+            {/* 직급 — non-sticky */}
+            <th className="bg-pwc-gray-50 px-2 py-2 text-left font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200">
               직급
             </th>
-            <th className="px-2 py-2 text-right font-semibold text-pwc-gray-600">
+            {/* 합계 — sticky right */}
+            <th className="sticky right-0 z-30 bg-pwc-gray-50 px-2 py-2 text-right font-semibold text-pwc-gray-600 border-b border-l border-pwc-gray-200" style={{ minWidth: 56 }}>
               합계
             </th>
             {viewMode === "month"
               ? MONTH_LABELS.map((label, i) => (
                   <th
                     key={MONTHS[i]}
-                    className="px-1 py-2 text-right font-semibold text-pwc-gray-600"
+                    className="bg-pwc-gray-50 px-1 py-2 text-right font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200"
                   >
                     {label}
                   </th>
@@ -195,12 +201,12 @@ export function MonthGrid({
               : QUARTERS.map((q) => (
                   <th
                     key={q.label}
-                    className="px-1 py-2 text-right font-semibold text-pwc-gray-600"
+                    className="bg-pwc-gray-50 px-1 py-2 text-right font-semibold text-pwc-gray-600 border-b border-r border-pwc-gray-200"
                   >
                     {q.label}
                   </th>
                 ))}
-            <th className="px-1 py-2 text-center font-semibold text-pwc-gray-600">
+            <th className="bg-pwc-gray-50 px-1 py-2 text-center font-semibold text-pwc-gray-600 border-b border-pwc-gray-200">
               <span title="복제/삭제">...</span>
             </th>
           </tr>
@@ -226,8 +232,8 @@ export function MonthGrid({
                   !row.enabled ? "opacity-30 bg-pwc-gray-50" : ""
                 } ${showCategory ? "border-t-2 border-t-pwc-gray-300" : ""}`}
               >
-                {/* Checkbox */}
-                <td className="px-1 py-0.5 text-center border-r border-pwc-gray-100">
+                {/* Checkbox — sticky left col 0 */}
+                <td className="sticky left-0 z-10 px-1 py-0.5 text-center border-r border-b border-pwc-gray-100 bg-white">
                   <input
                     type="checkbox"
                     checked={row.enabled}
@@ -235,15 +241,15 @@ export function MonthGrid({
                     className="accent-pwc-orange cursor-pointer"
                   />
                 </td>
-                {/* 대분류 */}
+                {/* 대분류 — sticky left col 1 */}
                 <td
-                  className="px-2 py-0.5 text-pwc-gray-500 border-r border-pwc-gray-100 truncate"
+                  className="sticky left-[32px] z-10 px-2 py-0.5 text-pwc-gray-500 border-r border-b border-pwc-gray-100 truncate bg-white"
                   title={row.budget_category}
                 >
                   {showCategory ? row.budget_category : ""}
                 </td>
-                {/* 관리단위 */}
-                <td className="px-0.5 py-0.5 border-r border-pwc-gray-100">
+                {/* 관리단위 — sticky left col 2 */}
+                <td className="sticky left-[132px] z-10 border-r border-b border-pwc-gray-100 px-0.5 py-0.5 bg-white">
                   <select
                     value={row.budget_unit}
                     onChange={(e) => {
@@ -279,13 +285,13 @@ export function MonthGrid({
                       ))}
                   </select>
                 </td>
-                {/* 담당자 */}
+                {/* 담당자 — sticky left col 3 */}
                 <td
-                  className={`px-0.5 py-0.5 border-r border-pwc-gray-100 ${
+                  className={`sticky left-[312px] z-10 px-0.5 py-0.5 border-r border-b border-pwc-gray-100 ${
                     activeCell?.row === currentVisualRow &&
                     activeCell?.col === FIRST_EDITABLE_COL
                       ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
-                      : ""
+                      : "bg-white"
                   }`}
                   onClick={() =>
                     row.enabled &&
@@ -335,7 +341,7 @@ export function MonthGrid({
                 </td>
                 {/* 직급 */}
                 <td
-                  className="px-2 py-0.5 text-pwc-gray-700 border-r border-pwc-gray-100 truncate"
+                  className="px-2 py-0.5 text-pwc-gray-700 border-r border-b border-pwc-gray-100 truncate"
                   title={
                     row.grade ||
                     (members.find((m) => m.empno === row.empno)?.grade ?? "")
@@ -345,8 +351,8 @@ export function MonthGrid({
                     members.find((m) => m.empno === row.empno)?.grade ||
                     ""}
                 </td>
-                {/* 합계 */}
-                <td className="px-2 py-0.5 text-right font-bold border-r border-pwc-gray-200 bg-pwc-gray-50/50">
+                {/* 합계 — sticky right */}
+                <td className="sticky right-0 z-10 px-2 py-0.5 text-right font-bold border-l border-b border-pwc-gray-200 bg-pwc-gray-50">
                   {total > 0 ? total : ""}
                 </td>
                 {/* 월별 셀 */}
@@ -365,7 +371,7 @@ export function MonthGrid({
                           key={month}
                           data-row={currentVisualRow}
                           data-col={colIdx}
-                          className={`px-0 py-0 text-right border-r border-pwc-gray-100 cursor-cell ${
+                          className={`px-0 py-0 text-right border-r border-b border-pwc-gray-100 cursor-cell ${
                             isActive
                               ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
                               : ""
@@ -404,14 +410,14 @@ export function MonthGrid({
                       return (
                         <td
                           key={q.label}
-                          className="text-right text-xs text-pwc-gray-700 px-2 border-r border-pwc-gray-100"
+                          className="text-right text-xs text-pwc-gray-700 px-2 border-r border-b border-pwc-gray-100"
                         >
                           {sum > 0 ? sum.toLocaleString("ko-KR") : ""}
                         </td>
                       );
                     })}
                 {/* Actions */}
-                <td className="px-1 py-0.5 text-center">
+                <td className="px-1 py-0.5 text-center border-b border-pwc-gray-100">
                   <div className="flex items-center justify-center gap-0.5">
                     <button
                       onClick={() => duplicateRow(idx)}
@@ -459,17 +465,21 @@ export function MonthGrid({
           })}
           {/* Totals row */}
           <tr className="border-t-2 border-pwc-black bg-pwc-gray-100 font-bold">
-            <td colSpan={5} className="px-2 py-2 text-right">
+            {/* sticky left cols — repeat bg for visibility */}
+            <td className="sticky left-0 z-10 bg-pwc-gray-100 px-1 py-2 border-r border-pwc-gray-200" />
+            <td className="sticky left-[32px] z-10 bg-pwc-gray-100 px-2 py-2 border-r border-pwc-gray-200 text-right" colSpan={3}>
               합계
             </td>
-            <td className="px-2 py-2 text-right">
+            <td className="bg-pwc-gray-100 px-2 py-2 border-r border-pwc-gray-200" />
+            {/* sticky right — grand total */}
+            <td className="sticky right-0 z-10 bg-pwc-gray-100 px-2 py-2 text-right border-l border-pwc-gray-200">
               {templateTotal.total > 0
                 ? templateTotal.total.toLocaleString()
                 : ""}
             </td>
             {viewMode === "month"
               ? MONTHS.map((month) => (
-                  <td key={month} className="px-1 py-2 text-right">
+                  <td key={month} className="bg-pwc-gray-100 px-1 py-2 text-right border-r border-pwc-gray-200">
                     {templateTotal.monthTotals[month] > 0
                       ? templateTotal.monthTotals[month]
                       : ""}
@@ -481,12 +491,12 @@ export function MonthGrid({
                     0
                   );
                   return (
-                    <td key={q.label} className="px-1 py-2 text-right">
+                    <td key={q.label} className="bg-pwc-gray-100 px-1 py-2 text-right border-r border-pwc-gray-200">
                       {total > 0 ? total.toLocaleString("ko-KR") : ""}
                     </td>
                   );
                 })}
-            <td />
+            <td className="bg-pwc-gray-100" />
           </tr>
         </tbody>
       </table>
