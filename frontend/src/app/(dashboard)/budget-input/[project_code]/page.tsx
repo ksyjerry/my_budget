@@ -363,16 +363,6 @@ export default function BudgetWizardPage() {
             removeMember={removeMember}
             updateMember={updateMember}
             activityOptions={activityOptions}
-            projectCode={project.project_code}
-            onMembersImported={async () => {
-              const code = project.project_code || projectCode;
-              if (!code || code === "new") return;
-              const r = await fetch(`${API_BASE}/api/v1/budget/projects/${code}/members`);
-              if (r.ok) {
-                const data = await r.json();
-                if (Array.isArray(data)) setMembers(data);
-              }
-            }}
           />
         )}
         {step === 3 && (

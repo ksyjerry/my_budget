@@ -126,8 +126,6 @@ interface Step2MembersProps {
   removeMember: (idx: number) => void;
   updateMember: (idx: number, field: keyof Member, value: string | number) => void;
   activityOptions: string[];
-  projectCode: string;
-  onMembersImported?: () => Promise<void>;
 }
 
 export function Step2Members({
@@ -137,58 +135,7 @@ export function Step2Members({
   removeMember,
   updateMember,
   activityOptions,
-  projectCode,
-  onMembersImported,
 }: Step2MembersProps) {
-  async function handleExportMembers() {
-    const res = await fetch(
-      `${API_BASE}/api/v1/budget/projects/${projectCode}/members/export`,
-      { credentials: "include" }
-    );
-    if (!res.ok) {
-      alert("다운로드 실패");
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `members_${projectCode}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function handleImportMembers(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    try {
-      const r = await fetch(
-        `${API_BASE}/api/v1/budget/projects/${projectCode}/members/upload`,
-        { method: "POST", body: fd, credentials: "include" }
-      );
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({ detail: "업로드 실패" }));
-        alert(d.detail || "업로드 실패");
-        return;
-      }
-      const data = await r.json();
-      let msg = `${data.imported_count} 명 업로드 완료.`;
-      if (data.skipped?.length > 0) {
-        msg += `\n제외 ${data.skipped.length} 명:\n` +
-          data.skipped.map((s: { empno?: string; reason: string }) =>
-            `  - ${s.empno ?? "(no empno)"}: ${s.reason}`
-          ).join("\n");
-      }
-      alert(msg);
-      if (onMembersImported) await onMembersImported();
-    } catch (err) {
-      alert(`업로드 오류: ${err instanceof Error ? err.message : "알 수 없음"}`);
-    }
-    e.target.value = "";
-  }
-
   // 원본 index 를 보존한 채 grade 순으로 정렬 (state 업데이트는 originalIdx 사용)
   const sortedFldt = members
     .map((m, originalIdx) => ({ m, originalIdx }))
@@ -203,26 +150,6 @@ export function Step2Members({
 
   return (
     <div className="space-y-6">
-      {/* Excel 다운로드/업로드 */}
-      <div className="flex items-center gap-2 mb-3">
-        <button
-          type="button"
-          onClick={handleExportMembers}
-          className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900"
-        >
-          📥 Excel 다운로드
-        </button>
-        <label className="px-3 py-1.5 text-xs border border-pwc-gray-200 rounded-md hover:bg-pwc-gray-50 text-pwc-gray-900 cursor-pointer">
-          📤 Excel 업로드
-          <input
-            type="file"
-            accept=".xlsx"
-            className="hidden"
-            onChange={handleImportMembers}
-          />
-        </label>
-      </div>
-
       {/* FLDT 구성원 */}
       <section>
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
