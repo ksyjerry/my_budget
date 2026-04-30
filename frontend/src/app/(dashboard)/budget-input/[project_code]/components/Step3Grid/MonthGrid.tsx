@@ -436,7 +436,8 @@ export function MonthGrid({
                                 handleGridKeyDown(e, currentVisualRow, colIdx)
                               }
                               onBlur={() => setEditingCell(null)}
-                              className="w-full h-full px-1 py-0 text-xs text-right bg-white border-0 outline-none leading-tight"
+                              className="w-full h-full"
+                              inputClassName="px-1 py-0 text-xs bg-white border-0 outline-none leading-tight h-full"
                             />
                           ) : (
                             <div className="px-1 py-0 text-xs leading-tight">
