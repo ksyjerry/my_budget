@@ -14,7 +14,7 @@ test.describe("regression #57 — 클라이언트 변경 시 의존 필드가 �
 
     await page.getByRole("button", { name: /클라이언트.*검색/ }).first().click();
     await page.waitForTimeout(300);
-    let modalRows = page.locator('[data-modal="client-search"] tbody tr, [role="dialog"] tbody tr').first();
+    const modalRows = page.locator('[data-modal="client-search"] tbody tr, [role="dialog"] tbody tr').first();
     if (await modalRows.count() > 0) {
       await modalRows.click();
     } else {
