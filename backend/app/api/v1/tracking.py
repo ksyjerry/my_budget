@@ -21,15 +21,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _get_partner_access(db: Session, empno: str) -> Optional[PartnerAccessConfig]:
-    return db.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == empno).first()
+def _get_partner_access(
+    db: Session, empno: str, user: Optional[dict] = None
+) -> Optional[PartnerAccessConfig]:
+    """Tracking 권한 판정 (POL-08 (b): EL + admin).
+
+    Priority order:
+      1. partner_access_config row 명시 등록 → 그 scope (all / departments / self) 사용
+      2. user.role == 'admin' → 자동 scope='all' (DB row 없어도)
+      3. 어떤 Project 의 el_empno 일치 → 자동 scope='self' (모든 EL 자동 access)
+      4. 그 외 → None (접근 거부)
+
+    user 인자 미제공 시 fallback 으로 partner_access_config 만 조회 (legacy).
+    """
+    cfg = db.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == empno).first()
+    if cfg:
+        return cfg
+
+    # Implicit access — user 컨텍스트가 있을 때만 작동
+    if user is None:
+        return None
+
+    # Admin role → all scope (메모리 객체, 영속 안 함)
+    if user.get("role") == "admin":
+        return PartnerAccessConfig(empno=empno, scope="all")
+
+    # 어떤 프로젝트의 EL 인지 확인 → self scope
+    is_el = db.query(Project.id).filter(Project.el_empno == empno).first() is not None
+    if is_el:
+        return PartnerAccessConfig(empno=empno, scope="self")
+
+    return None
 
 
 def _get_allowed_project_codes(db: Session, user: dict) -> list[str]:
     """사용자 scope에 따라 접근 가능한 프로젝트 코드 목록."""
-    cfg = _get_partner_access(db, user["empno"])
+    cfg = _get_partner_access(db, user["empno"], user)
     if not cfg:
-        # partner_access_config에 등록되지 않은 경우 = Partner 권한 없음
         return []
 
     if cfg.scope == "all":
@@ -66,7 +94,7 @@ def get_tracking_projects(
     if not user:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
-    cfg = _get_partner_access(db, user["empno"])
+    cfg = _get_partner_access(db, user["empno"], user)
     if not cfg:
         raise HTTPException(status_code=403, detail="Partner 권한이 필요합니다.")
 
@@ -304,7 +332,7 @@ def get_tracking_project_detail(
     if not user:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
-    cfg = _get_partner_access(db, user["empno"])
+    cfg = _get_partner_access(db, user["empno"], user)
     if not cfg:
         raise HTTPException(status_code=403, detail="Partner 권한이 필요합니다.")
 
@@ -490,7 +518,7 @@ def get_tracking_filter_options(
     if not user:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
-    cfg = _get_partner_access(db, user["empno"])
+    cfg = _get_partner_access(db, user["empno"], user)
     if not cfg:
         raise HTTPException(status_code=403, detail="Partner 권한이 필요합니다.")
 
@@ -541,7 +569,7 @@ def check_tracking_access(
     """현재 사용자가 Tracking 기능에 접근 권한이 있는지 확인."""
     if not user:
         return {"has_access": False, "reason": "로그인 필요"}
-    cfg = _get_partner_access(db, user["empno"])
+    cfg = _get_partner_access(db, user["empno"], user)
     if not cfg:
         return {"has_access": False, "reason": "Partner 권한 없음"}
     return {
