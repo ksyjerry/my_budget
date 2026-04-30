@@ -331,11 +331,11 @@ export function MonthGrid({
                 </td>
                 {/* 담당자 — sticky left col 3 */}
                 <td
-                  className={`sticky left-[312px] z-10 px-0.5 py-0 border-r border-b border-pwc-gray-100 ${
+                  className={`sticky left-[312px] z-10 px-0.5 py-0 border-r border-b border-pwc-gray-100 bg-white ${
                     activeCell?.row === currentVisualRow &&
                     activeCell?.col === FIRST_EDITABLE_COL
-                      ? "bg-blue-50 ring-1 ring-blue-400 ring-inset"
-                      : "bg-white"
+                      ? "outline outline-1 outline-blue-400 -outline-offset-1"
+                      : ""
                   } ${empnoValidationClass}`}
                   onClick={() =>
                     row.enabled &&
@@ -417,7 +417,7 @@ export function MonthGrid({
                           data-col={colIdx}
                           className={`px-0 py-0 text-right border-r border-b border-pwc-gray-100 cursor-cell ${
                             isActive
-                              ? "bg-blue-50 ring-1 ring-blue-400 ring-inset"
+                              ? "outline outline-1 outline-blue-400 -outline-offset-1"
                               : ""
                           }`}
                           onClick={() =>
