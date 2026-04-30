@@ -12,9 +12,10 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
-from app.api.v1 import auth, budget_upload, budget_input, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist, tracking, sync
+from app.api.v1 import auth, budget_upload, budget_input, budget_workflow, overview, projects, assignments, summary, export, cache, admin, chat, budget_assist, tracking, sync
 
 app = FastAPI(title=settings.APP_NAME, version="0.1.0")
+logger = logging.getLogger(__name__)
 
 
 @app.on_event("startup")
@@ -76,9 +77,35 @@ def _scheduled_session_cleanup():
         db.close()
 
 
+def _scheduled_tba_sync():
+    """매일 04:00 KST — POL-05 TBA 캐시 동기화 (신규 프로젝트 포함 전체 갱신)."""
+    import os
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    from app.db.session import SessionLocal
+    from app.api.v1.tracking import _sync_tba_cache
+    logger = logging.getLogger("scheduler")
+    db = SessionLocal()
+    try:
+        result = _sync_tba_cache(db)
+        logger.info(f"daily_tba_sync: {result}")
+    except Exception as e:
+        logger.error(f"daily_tba_sync failed: {e}")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def start_scheduler():
     if not _scheduler.running:
+        _scheduler.add_job(
+            _scheduled_tba_sync,
+            "cron",
+            hour=4,
+            minute=0,
+            id="daily_tba_sync",
+            replace_existing=True,
+        )
         _scheduler.add_job(
             _scheduled_client_sync,
             "cron",
@@ -104,6 +131,7 @@ def start_scheduler():
             replace_existing=True,
         )
         _scheduler.start()
+        logger.info("daily_tba_sync scheduler started — runs at 04:00 KST")
 
 
 @app.on_event("shutdown")
@@ -124,6 +152,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(budget_upload.router, prefix="/api/v1/budget", tags=["budget-upload"])
 app.include_router(budget_input.router, prefix="/api/v1/budget", tags=["budget-input"])
+app.include_router(budget_workflow.router, prefix="/api/v1/budget", tags=["budget-workflow"])
 app.include_router(overview.router, prefix="/api/v1", tags=["overview"])
 app.include_router(projects.router, prefix="/api/v1", tags=["projects"])
 app.include_router(assignments.router, prefix="/api/v1", tags=["assignments"])
