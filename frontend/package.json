@@ -6,7 +6,11 @@
     "dev": "next dev --port 8001",
     "build": "next build",
     "start": "next start --port 8001",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "playwright test",
+    "test:smoke": "playwright test --project=smoke",
+    "test:visual": "playwright test --project=visual",
+    "test:regression": "playwright test --project=regression"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",

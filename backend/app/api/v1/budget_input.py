@@ -219,6 +219,7 @@ def list_registered_projects(
 def search_projects(q: str = "", client_code: str = "", db: Session = Depends(get_db)):
     """프로젝트 검색 — Azure DB(회사 전체) + PostgreSQL(Budget 등록 여부) 병합.
     client_code가 주어지면 해당 클라이언트(프로젝트코드 앞 5자리)에 종속된 프로젝트만 반환.
+    Azure 연결 불가 시 PostgreSQL에 등록된 프로젝트를 fallback으로 반환.
     """
     from app.services import azure_service
 
@@ -228,57 +229,102 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
         q, limit=200, client_code_prefix=client_code
     )
 
+    def _pg_extra(p: "Project") -> dict:
+        return {
+            "contract_hours": float(p.contract_hours or 0),
+            "axdx_hours": float(p.axdx_hours or 0),
+            "qrp_hours": float(p.qrp_hours or 0),
+            "rm_hours": float(p.rm_hours or 0),
+            "el_hours": float(p.el_hours or 0),
+            "pm_hours": float(p.pm_hours or 0),
+            "ra_elpm_hours": float(p.ra_elpm_hours or 0),
+            "et_controllable_budget": float(p.et_controllable_budget or 0),
+            "fulcrum_hours": float(p.fulcrum_hours or 0),
+            "ra_staff_hours": float(p.ra_staff_hours or 0),
+            "specialist_hours": float(p.specialist_hours or 0),
+            "travel_hours": float(p.travel_hours or 0),
+            "total_budget_hours": float(p.total_budget_hours or 0),
+            "template_status": p.template_status or "작성중",
+            "qrp_name": p.qrp_name or "",
+            "qrp_empno": p.qrp_empno or "",
+        }
+
+    _pg_extra_default = {
+        "contract_hours": 0, "axdx_hours": 0, "qrp_hours": 0,
+        "rm_hours": 0, "el_hours": 0, "pm_hours": 0,
+        "ra_elpm_hours": 0, "et_controllable_budget": 0,
+        "fulcrum_hours": 0, "ra_staff_hours": 0,
+        "specialist_hours": 0, "travel_hours": 0,
+        "total_budget_hours": 0, "template_status": "작성중",
+        "qrp_name": "", "qrp_empno": "",
+    }
+
     # 2) PostgreSQL에서 이미 Budget 등록된 프로젝트 조회
-    registered_codes = set()
+    registered_codes: set[str] = set()
     pg_data: dict[str, dict] = {}
+
     if azure_results:
         codes = [r["project_code"] for r in azure_results]
         pg_projects = db.query(Project).filter(Project.project_code.in_(codes)).all()
         for p in pg_projects:
             registered_codes.add(p.project_code)
-            pg_data[p.project_code] = {
-                "contract_hours": float(p.contract_hours or 0),
-                "axdx_hours": float(p.axdx_hours or 0),
-                "qrp_hours": float(p.qrp_hours or 0),
-                "rm_hours": float(p.rm_hours or 0),
-                "el_hours": float(p.el_hours or 0),
-                "pm_hours": float(p.pm_hours or 0),
-                "ra_elpm_hours": float(p.ra_elpm_hours or 0),
-                "et_controllable_budget": float(p.et_controllable_budget or 0),
-                "fulcrum_hours": float(p.fulcrum_hours or 0),
-                "ra_staff_hours": float(p.ra_staff_hours or 0),
-                "specialist_hours": float(p.specialist_hours or 0),
-                "travel_hours": float(p.travel_hours or 0),
-                "total_budget_hours": float(p.total_budget_hours or 0),
-                "template_status": p.template_status or "작성중",
-                "qrp_name": p.qrp_name or "",
-                "qrp_empno": p.qrp_empno or "",
-            }
+            pg_data[p.project_code] = _pg_extra(p)
 
-    # 3) 병합: Azure 기본정보 + PG Budget 정보
+        # 3a) 병합: Azure 기본정보 + PG Budget 정보
+        return [
+            {
+                "project_code": r["project_code"],
+                "project_name": r["project_name"],
+                "client_name": r["client_name"],
+                "department": r["department"],
+                "el_name": r["el_name"],
+                "el_empno": r["el_empno"],
+                "pm_name": r["pm_name"],
+                "pm_empno": r["pm_empno"],
+                "industry": r["industry"],
+                "is_registered": r["project_code"] in registered_codes,
+                **pg_data.get(r["project_code"], _pg_extra_default),
+            }
+            for r in azure_results
+        ]
+
+    # 3b) Azure 결과 없음 (연결 불가 or 필터 결과 0건) → PG 등록 프로젝트 fallback
+    #     client_code 필터 적용, q로 검색 (case-insensitive)
+    pg_query = db.query(Project)
+    if client_code:
+        prefix = client_code[:5]
+        pg_query = pg_query.filter(Project.project_code.ilike(f"{prefix}%"))
+    if q:
+        q_like = f"%{q}%"
+        pg_query = pg_query.filter(
+            Project.project_code.ilike(q_like) |
+            Project.project_name.ilike(q_like)
+        )
+    fallback_projects = pg_query.order_by(Project.project_code).limit(200).all()
+
+    # Also load client names via join
+    from app.models.project import Client
+    client_map: dict[int, str] = {}
+    client_ids = [p.client_id for p in fallback_projects if p.client_id]
+    if client_ids:
+        clients = db.query(Client).filter(Client.id.in_(client_ids)).all()
+        client_map = {c.id: c.client_name or "" for c in clients}
+
     return [
         {
-            "project_code": r["project_code"],
-            "project_name": r["project_name"],
-            "client_name": r["client_name"],
-            "department": r["department"],
-            "el_name": r["el_name"],
-            "el_empno": r["el_empno"],
-            "pm_name": r["pm_name"],
-            "pm_empno": r["pm_empno"],
-            "industry": r["industry"],
-            "is_registered": r["project_code"] in registered_codes,
-            **pg_data.get(r["project_code"], {
-                "contract_hours": 0, "axdx_hours": 0, "qrp_hours": 0,
-                "rm_hours": 0, "el_hours": 0, "pm_hours": 0,
-                "ra_elpm_hours": 0, "et_controllable_budget": 0,
-                "fulcrum_hours": 0, "ra_staff_hours": 0,
-                "specialist_hours": 0, "travel_hours": 0,
-                "total_budget_hours": 0, "template_status": "작성중",
-                "qrp_name": "", "qrp_empno": "",
-            }),
+            "project_code": p.project_code,
+            "project_name": p.project_name or "",
+            "client_name": client_map.get(p.client_id, "") if p.client_id else "",
+            "department": p.department or "",
+            "el_name": p.el_name or "",
+            "el_empno": p.el_empno or "",
+            "pm_name": p.pm_name or "",
+            "pm_empno": p.pm_empno or "",
+            "industry": "",
+            "is_registered": True,
+            **_pg_extra(p),
         }
-        for r in azure_results
+        for p in fallback_projects
     ]
 
 

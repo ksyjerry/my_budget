@@ -19,72 +19,7 @@ import {
   generateMonths,
   generateMonthLabels,
 } from "@/lib/budget-constants";
-
-// ── NumberField (외부 정의 — re-render 시 focus 유지) ──
-interface NumberFieldProps {
-  label: string;
-  value?: number;
-  onChange?: (v: number) => void;
-  readOnly?: boolean;
-  step?: number;
-  min?: number;
-  max?: number;
-  allowNegative?: boolean;
-  contractHours?: number;
-}
-
-function NumberField(props: NumberFieldProps) {
-  const {
-    label,
-    value,
-    onChange,
-    readOnly,
-    step = 1,
-    min,
-    max,
-    allowNegative = false,
-    contractHours,
-  } = props;
-
-  const pct = contractHours && contractHours > 0 && value
-    ? `${Math.round(value / contractHours * 100)}%`
-    : null;
-
-  const display =
-    readOnly && typeof value === "number"
-      ? value.toLocaleString("ko-KR")
-      : value ?? "";
-
-  return (
-    <div>
-      <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-        {label}
-        {pct && <span className="ml-1 text-pwc-orange">({pct})</span>}
-      </label>
-      <input
-        type={readOnly ? "text" : "number"}
-        value={display}
-        step={step}
-        min={min}
-        max={max}
-        readOnly={readOnly}
-        onChange={(e) => {
-          let v = parseFloat(e.target.value);
-          if (Number.isNaN(v)) v = 0;
-          if (!allowNegative && v < 0) v = 0;
-          if (typeof min === "number" && v < min) v = min;
-          if (typeof max === "number" && v > max) v = max;
-          onChange?.(v);
-        }}
-        className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-          readOnly
-            ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
-            : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
-        }`}
-      />
-    </div>
-  );
-}
+import { NumberField } from "@/components/ui/NumberField";
 
 // ── Types ──────────────────────────────────────────
 interface ProjectInfo {
@@ -692,7 +627,7 @@ export default function BudgetWizardPage() {
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div className="flex items-center gap-3">
           <Link
             href="/budget-input"
@@ -1025,40 +960,66 @@ function ProjectSearchModal({
   onClose: () => void;
   clientCode?: string;
 }) {
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchResults = async (q: string) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (clientCode) params.set("client_code", clientCode);
+      if (q) params.set("q", q);
+      const res = await fetch(
+        `${API_BASE}/api/v1/budget/projects/search?${params.toString()}`
+      );
+      if (res.ok) setResults(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (clientCode) params.set("client_code", clientCode);
-        const res = await fetch(
-          `${API_BASE}/api/v1/budget/projects/search?${params.toString()}`
-        );
-        if (res.ok) setResults(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    fetchResults("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientCode]);
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    fetchResults(val);
+  };
+
+  const infoText = clientCode
+    ? "선택한 클라이언트에 속한 프로젝트 목록입니다. 클릭하여 선택하세요."
+    : "프로젝트 코드 또는 이름으로 검색하세요. 클라이언트 미선택 시 등록된 프로젝트가 표시됩니다.";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div role="dialog" aria-modal="true" data-modal="project-search" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-[750px] max-h-[80vh] flex flex-col">
         <div className="px-5 py-4 border-b border-pwc-gray-100 flex items-center justify-between shrink-0">
           <h3 className="text-sm font-bold text-pwc-black">프로젝트 선택</h3>
           <button onClick={onClose} className="text-pwc-gray-600 hover:text-pwc-black text-lg leading-none">&times;</button>
         </div>
         <div className="px-5 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-700 shrink-0">
-          선택한 클라이언트에 속한 프로젝트 목록입니다. 클릭하여 선택하세요.
+          {infoText}
+        </div>
+        <div className="px-5 py-2 border-b border-pwc-gray-100 shrink-0">
+          <input
+            type="search"
+            placeholder="프로젝트 코드 또는 이름 검색"
+            value={query}
+            onChange={handleSearch}
+            className="w-full px-3 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
+          />
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
             <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">불러오는 중...</div>
           ) : results.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">해당 클라이언트의 프로젝트가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-sm text-pwc-gray-600">
+              {clientCode ? "해당 클라이언트의 프로젝트가 없습니다." : "검색 결과가 없습니다."}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-pwc-gray-50 sticky top-0">
@@ -1074,6 +1035,7 @@ function ProjectSearchModal({
                 {results.map((p) => (
                   <tr
                     key={p.project_code as string}
+                    data-row="project"
                     className="border-t border-pwc-gray-100 cursor-pointer hover:bg-orange-50 transition-colors"
                     onClick={() => { onSelect(p); onClose(); }}
                   >
@@ -1543,6 +1505,7 @@ function Step1Form({
               type="text"
               value={project.project_name}
               readOnly
+              placeholder="프로젝트명"
               className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
             />
           </div>
@@ -1585,10 +1548,10 @@ function Step1Form({
             </label>
             <input
               type="text"
-              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : ""}
-              readOnly
+              value={project.qrp_name ? `${project.qrp_name}(${project.qrp_empno})` : project.qrp_empno}
+              onChange={(e) => pField("qrp_empno", e.target.value)}
               placeholder="QRP 사번 입력 또는 검색"
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-200 rounded focus:outline-none focus:border-pwc-orange"
             />
           </div>
         </div>
@@ -1784,7 +1747,7 @@ function EmployeeSearch({
     if (q.length < 1) { setResults([]); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/budget/employees/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${API_BASE}/api/v1/budget/employees/search?q=${encodeURIComponent(q)}&include_inactive=true`);
       if (res.ok) setResults(await res.json());
     } finally {
       setLoading(false);
@@ -1813,6 +1776,9 @@ function EmployeeSearch({
             const r = results[0];
             if (r.emp_status && r.emp_status !== "재직") {
               alert(`사번 ${r.empno} 은(는) 현재 재직 중인 직원이 아닙니다. 퇴사/휴직 상태입니다.`);
+              setQuery("");
+              setResults([]);
+              setOpen(false);
               return;
             }
             onSelect(r.name, r.empno, r.grade);
@@ -2877,17 +2843,16 @@ function Step3Template({
                             onClick={() => row.enabled && handleCellClick(currentVisualRow, colIdx)}
                           >
                             {isEditing && row.enabled ? (
-                              <input
-                                type="number"
+                              <NumberField
                                 autoFocus
-                                value={row.months[month] || ""}
-                                onChange={(e) => updateRowMonth(idx, month, Number(e.target.value) || 0)}
+                                value={row.months[month] || 0}
+                                step={0.25}
+                                min={0}
+                                max={300}
+                                onChange={(v) => updateRowMonth(idx, month, v)}
                                 onKeyDown={(e) => handleGridKeyDown(e, currentVisualRow, colIdx)}
                                 onBlur={() => { setEditingCell(null); }}
                                 className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
-                                min={0}
-                                max={300}
-                                step={0.25}
                               />
                             ) : (
                               <div className="px-1 py-1 min-h-[24px] text-xs">
