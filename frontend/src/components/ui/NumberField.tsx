@@ -18,6 +18,8 @@ export interface NumberFieldProps {
   /** Optional placeholder for editable mode. */
   placeholder?: string;
   className?: string;
+  /** Override inner <input> styling (Step 3 grid cells use compact mode). */
+  inputClassName?: string;
   /** Forward autoFocus to the inner <input>. */
   autoFocus?: boolean;
   /** Forward onKeyDown to the inner <input>. */
@@ -51,6 +53,7 @@ export function NumberField(props: NumberFieldProps) {
     contractHours,
     placeholder,
     className,
+    inputClassName,
     autoFocus,
     onKeyDown,
     onBlur: onBlurProp,
@@ -107,11 +110,15 @@ export function NumberField(props: NumberFieldProps) {
           onBlurProp?.(e);
         }}
         onKeyDown={onKeyDown}
-        className={`w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-          readOnly
-            ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
-            : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
-        }`}
+        className={
+          inputClassName !== undefined
+            ? `w-full text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${inputClassName}`
+            : `w-full px-2 py-1.5 text-sm border rounded text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                readOnly
+                  ? "bg-pwc-gray-50 border-pwc-gray-100 text-pwc-gray-600"
+                  : "border-pwc-gray-200 focus:outline-none focus:border-pwc-orange"
+              }`
+        }
       />
     </div>
   );
