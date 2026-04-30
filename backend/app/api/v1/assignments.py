@@ -76,7 +76,8 @@ def list_assignments(
     return [
         {
             "empno": r.empno,
-            "emp_name": r.emp_name,
+            # #65: 이름 미등록 인원 fallback
+            "emp_name": r.emp_name if r.emp_name else f"이름 미등록 ({r.empno})",
             "department": r.department,
             "grade": azure_service.shorten_grade(r.grade or ""),
             "total_budget": float(r.total_budget),
@@ -154,9 +155,12 @@ def get_assignment_detail(
             "progress": round(a / b * 100, 1) if b else 0,
         })
 
+    # #65: 이름 미등록 인원 fallback
+    raw_name = emp_info.emp_name if emp_info else ""
+    emp_name_display = raw_name if raw_name else f"이름 미등록 ({empno})"
     return {
         "empno": empno,
-        "emp_name": emp_info.emp_name if emp_info else "",
+        "emp_name": emp_name_display,
         "department": emp_info.department if emp_info else "",
         "grade": azure_service.shorten_grade(emp_info.grade) if emp_info else "",
         "projects": projects_summary,

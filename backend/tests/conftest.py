@@ -26,9 +26,12 @@ def db():
 
 @pytest.fixture(scope="session", autouse=True)
 def _seed_test_employees():
-    """Seed Employee rows for fixture empnos so sessions FK constraint passes.
+    """Seed Employee + PartnerAccessConfig rows for fixture empnos.
 
-    Idempotent: skip if already present (CI: empty DB / dev: real employee sync)."""
+    - Employee: sessions FK constraint
+    - PartnerAccessConfig: tracking endpoints require partner row (POL-08)
+    Idempotent: skip if already present."""
+    from app.models.budget_master import PartnerAccessConfig
     s = SessionLocal()
     try:
         seeds = [
@@ -39,6 +42,14 @@ def _seed_test_employees():
         for empno, name in seeds:
             if s.query(Employee).filter(Employee.empno == empno).first() is None:
                 s.add(Employee(empno=empno, name=name, emp_status="재직"))
+        # Partner access for elpm/admin (Staff 320915 는 partner 가 아님 → seed 안 함)
+        partner_seeds = [
+            ("170661", "최성우", "self"),
+            ("160553", "관리자", "all"),
+        ]
+        for empno, name, scope in partner_seeds:
+            if s.query(PartnerAccessConfig).filter(PartnerAccessConfig.empno == empno).first() is None:
+                s.add(PartnerAccessConfig(empno=empno, emp_name=name, scope=scope))
         s.commit()
     finally:
         s.close()

@@ -9,6 +9,7 @@ from app.models.project import Client, Project
 from app.models.budget import BudgetDetail
 from app.services import azure_service
 from app.services.budget_category_map import get_category
+from app.services.budget_definitions import display_budget, axdx_excluded_budget
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +260,9 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
 
     # ③ Role 매핑 (EL/PM/QRP)
     role_mappings = []
+    # #93: QRP TMS lookup — collect role_empnos for ALL assigned roles (hours=0 인 경우도
+    # TMS actual 조회를 위해 포함).  단, elpm_qrp_time 에는 budget>0 인 행만 노출.
+    all_role_empnos: set[str] = set()
     for p in projects:
         for role, empno_field, hours_field in [
             ("EL", p.el_empno, p.el_hours),
@@ -267,6 +271,8 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
         ]:
             emp = empno_field or ""
             budget_hrs = hours_field or 0
+            if emp:
+                all_role_empnos.add(emp)
             if budget_hrs:
                 role_mappings.append({
                     "project_code": p.project_code,
@@ -276,7 +282,7 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                     "budget": float(budget_hrs),
                 })
 
-    role_empnos = list({rm["empno"] for rm in role_mappings if rm["empno"]}) or None
+    role_empnos = sorted(all_role_empnos) or None
 
     # #25: Budget 없는 staff 의 TMS 시간도 포함 — TMS 에서 본 empno ∪ budget empno, role 제외
     budgeted_empnos = set(staff_budget.keys()) if staff_budget else set()
@@ -370,8 +376,16 @@ def get_overview_data(db: Session, el_empno: str = None, pm_empno: str = None,
                 "el_name": p.el_name,
                 "pm_name": p.pm_name,
                 "template_status": p.template_status or "",
-                "budget": float(p.contract_hours or 0),
+                # POL-01 (b): display_budget = contract_hours − axdx_hours
+                "budget": display_budget(p, view="overview_project_table_budget"),
+                "contract_hours": float(p.contract_hours or 0),
                 "actual": float(actual_map.get(p.project_code, 0)),
+                # real_progress: actual / display_budget (AX/DX 제외 기준)
+                "real_progress": round(
+                    float(actual_map.get(p.project_code, 0)) /
+                    display_budget(p, view="overview_project_table_budget") * 100, 1
+                ) if axdx_excluded_budget(p) > 0 else 0,
+                # progress: actual / contract_hours (전통적 KPI 기준)
                 "progress": round(
                     float(actual_map.get(p.project_code, 0)) /
                     float(p.contract_hours or 1) * 100, 1

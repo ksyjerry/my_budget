@@ -58,11 +58,5 @@ BudgetView = Literal[
 
 
 def display_budget(project, *, view: BudgetView) -> float:
-    """View별 표시 Budget — POL-01 결정 후 routing.
-
-    POL-01 미결정 동안 raise NotImplementedError. 영역 6에서 활성화.
-    """
-    raise NotImplementedError(
-        f"display_budget(view={view!r}) blocked: POL-01 미결정. "
-        "메타 spec 1.4 + policy-decisions.md 참고."
-    )
+    """View별 표시 Budget — POL-01 (b) 적용: 모든 view에서 axdx_excluded_budget()."""
+    return axdx_excluded_budget(project)
