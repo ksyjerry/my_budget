@@ -250,7 +250,7 @@ export function MonthGrid({
             return (
               <tr
                 key={idx}
-                className={`border-b border-pwc-gray-100 hover:bg-blue-50/30 transition-colors ${
+                className={`h-7 border-b border-pwc-gray-100 hover:bg-blue-50/30 transition-colors ${
                   !row.enabled ? "opacity-30 bg-pwc-gray-50" : ""
                 } ${showCategory ? "border-t-2 border-t-pwc-gray-300" : ""}`}
               >
@@ -293,7 +293,7 @@ export function MonthGrid({
                   )}
                 </td>
                 {/* 관리단위 — sticky left col 2 */}
-                <td className="sticky left-[132px] z-10 border-r border-b border-pwc-gray-100 px-0.5 py-0.5 bg-white">
+                <td className="sticky left-[132px] z-10 border-r border-b border-pwc-gray-100 px-0.5 py-0 bg-white">
                   <select
                     value={row.budget_unit}
                     onChange={(e) => {
@@ -318,7 +318,7 @@ export function MonthGrid({
                       setRows(newRows);
                     }}
                     disabled={!row.enabled}
-                    className="w-full px-1 py-1 text-xs font-medium bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer truncate"
+                    className="w-full h-full px-1 py-0 text-xs font-medium bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer truncate leading-tight"
                   >
                     {budgetUnits
                       .filter((u) => u.category === row.budget_category)
@@ -331,10 +331,10 @@ export function MonthGrid({
                 </td>
                 {/* 담당자 — sticky left col 3 */}
                 <td
-                  className={`sticky left-[312px] z-10 px-0.5 py-0.5 border-r border-b border-pwc-gray-100 ${
+                  className={`sticky left-[312px] z-10 px-0.5 py-0 border-r border-b border-pwc-gray-100 ${
                     activeCell?.row === currentVisualRow &&
                     activeCell?.col === FIRST_EDITABLE_COL
-                      ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
+                      ? "bg-blue-50 ring-1 ring-blue-400 ring-inset"
                       : "bg-white"
                   } ${empnoValidationClass}`}
                   onClick={() =>
@@ -370,7 +370,7 @@ export function MonthGrid({
                       );
                     }}
                     disabled={!row.enabled}
-                    className="w-full px-1 py-1 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer"
+                    className="w-full h-full px-1 py-0 text-xs bg-transparent border-0 focus:outline-none focus:ring-0 disabled:opacity-50 cursor-pointer leading-tight"
                   >
                     <option value="">선택</option>
                     {[...members]
@@ -417,7 +417,7 @@ export function MonthGrid({
                           data-col={colIdx}
                           className={`px-0 py-0 text-right border-r border-b border-pwc-gray-100 cursor-cell ${
                             isActive
-                              ? "bg-blue-50 ring-2 ring-blue-400 ring-inset"
+                              ? "bg-blue-50 ring-1 ring-blue-400 ring-inset"
                               : ""
                           }`}
                           onClick={() =>
@@ -436,10 +436,10 @@ export function MonthGrid({
                                 handleGridKeyDown(e, currentVisualRow, colIdx)
                               }
                               onBlur={() => setEditingCell(null)}
-                              className="w-full h-full px-1 py-1 text-xs text-right bg-white border-0 outline-none"
+                              className="w-full h-full px-1 py-0 text-xs text-right bg-white border-0 outline-none leading-tight"
                             />
                           ) : (
-                            <div className="px-1 py-1 min-h-[24px] text-xs">
+                            <div className="px-1 py-0 text-xs leading-tight">
                               {row.months[month] || ""}
                             </div>
                           )}
