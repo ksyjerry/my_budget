@@ -844,6 +844,7 @@ export default function BudgetWizardPage() {
         {step === 2 && (
           <Step2Members
             members={members}
+            setMembers={setMembers}
             addMember={addMember}
             removeMember={removeMember}
             updateMember={updateMember}
@@ -1926,6 +1927,7 @@ function EmployeeSearch({
 
 function Step2Members({
   members,
+  setMembers,
   addMember,
   removeMember,
   updateMember,
@@ -1934,6 +1936,7 @@ function Step2Members({
   onMembersImported,
 }: {
   members: Member[];
+  setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
   addMember: (role: string) => void;
   removeMember: (idx: number) => void;
   updateMember: (idx: number, field: keyof Member, value: string | number) => void;
