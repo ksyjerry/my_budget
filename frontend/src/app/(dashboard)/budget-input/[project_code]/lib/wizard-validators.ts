@@ -96,8 +96,8 @@ export function getCellValidationClass(
   columnType: "empno" | "hours-total"
 ): string {
   const status = validateRow(row);
-  if (columnType === "empno" && status === "missing-empno") return "ring-2 ring-pwc-red ring-inset bg-red-50";
-  if (columnType === "hours-total" && status === "no-hours") return "ring-2 ring-pwc-yellow ring-inset bg-yellow-50";
-  if (columnType === "hours-total" && status === "negative") return "ring-2 ring-pwc-red ring-inset bg-red-50";
+  if (columnType === "empno" && status === "missing-empno") return "ring-1 ring-pwc-red ring-inset bg-red-50/50";
+  if (columnType === "hours-total" && status === "no-hours") return "ring-1 ring-pwc-yellow ring-inset bg-yellow-50/50";
+  if (columnType === "hours-total" && status === "negative") return "ring-1 ring-pwc-red ring-inset bg-red-50/50";
   return "";
 }
