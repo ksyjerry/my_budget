@@ -793,7 +793,8 @@ export default function BudgetWizardPage() {
             onCloneFromProject={async (sourceCode: string) => {
               try {
                 const res = await fetch(
-                  `${API_BASE}/api/v1/budget/projects/${sourceCode}/clone-data`
+                  `${API_BASE}/api/v1/budget/projects/${sourceCode}/clone-data`,
+                  { credentials: "include" }
                 );
                 if (!res.ok) throw new Error("Failed");
                 const data = await res.json();
@@ -1271,7 +1272,7 @@ function Step1Form({
   project: ProjectInfo;
   setProject: (p: ProjectInfo) => void;
   client: ClientInfo;
-  setClient: (c: ClientInfo) => void;
+  setClient: React.Dispatch<React.SetStateAction<ClientInfo>>;
   etControllable: number;
   isNew: boolean;
   onCloneFromProject: (projectCode: string) => void;
@@ -1336,147 +1337,55 @@ function Step1Form({
               );
               if (r.ok) {
                 const info = await r.json();
-                const base = client;
                 setClient({
-                  ...base,
                   ...c,
-                  industry: base.industry || info.industry || "",
-                  asset_size: base.asset_size || info.asset_size || "",
-                  listing_status:
-                    base.listing_status || info.listing_status || "",
+                  industry: info.industry || c.industry || "",
+                  asset_size: info.asset_size || c.asset_size || "",
+                  listing_status: info.listing_status || c.listing_status || "",
                   business_report:
-                    base.business_report || info.business_report || "",
-                  gaap: base.gaap || info.gaap || "",
-                  consolidated: base.consolidated || info.consolidated || "",
+                    info.business_report || c.business_report || "",
+                  gaap: info.gaap || c.gaap || "",
+                  consolidated: info.consolidated || c.consolidated || "",
                   subsidiary_count:
-                    base.subsidiary_count || info.subsidiary_count || "",
+                    info.subsidiary_count || c.subsidiary_count || "",
                   internal_control:
-                    base.internal_control || info.internal_control || "",
-                  initial_audit: base.initial_audit || info.initial_audit || "",
+                    info.internal_control || c.internal_control || "",
+                  initial_audit: info.initial_audit || c.initial_audit || "",
                 });
               } else {
-                setClient({ ...client, ...c });
+                // Reset to new client's own values — don't preserve previous
+                setClient({
+                  ...c,
+                  industry: c.industry || "",
+                  asset_size: c.asset_size || "",
+                  listing_status: c.listing_status || "",
+                  business_report: c.business_report || "",
+                  gaap: c.gaap || "",
+                  consolidated: c.consolidated || "",
+                  subsidiary_count: c.subsidiary_count || "",
+                  internal_control: c.internal_control || "",
+                  initial_audit: c.initial_audit || "",
+                });
               }
             } catch {
-              setClient({ ...client, ...c });
+              // Reset to new client's values — don't preserve previous
+              setClient({
+                ...c,
+                industry: c.industry || "",
+                asset_size: c.asset_size || "",
+                listing_status: c.listing_status || "",
+                business_report: c.business_report || "",
+                gaap: c.gaap || "",
+                consolidated: c.consolidated || "",
+                subsidiary_count: c.subsidiary_count || "",
+                internal_control: c.internal_control || "",
+                initial_audit: c.initial_audit || "",
+              });
             }
           }}
           onClose={() => setShowClientSearch(false)}
         />
       )}
-
-      {/* 클라이언트 기본정보 */}
-      <section>
-        <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
-          <h3 className="text-sm font-bold text-pwc-black">
-            클라이언트 기본정보
-          </h3>
-          <button
-            type="button"
-            onClick={() => setShowClientSearch(true)}
-            className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
-          >
-            클라이언트 검색
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {!isAudit && (
-            <div className="col-span-full text-xs text-pwc-gray-600 bg-pwc-gray-50 rounded-md p-2 mb-3">
-              비감사 서비스는 표준산업분류 · 자산규모 · 상장여부 3가지 정보만 입력합니다.
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              Client Code
-            </label>
-            <input
-              type="text"
-              value={client.client_code}
-              onChange={(e) => cField("client_code", e.target.value)}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
-              Client Name
-            </label>
-            <input
-              type="text"
-              value={client.client_name}
-              onChange={(e) => cField("client_name", e.target.value)}
-              readOnly
-              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
-            />
-          </div>
-          <SelectField
-            label="표준산업분류"
-            value={client.industry}
-            options={INDUSTRY_OPTIONS}
-            onChange={(v) => cField("industry", v)}
-          />
-          <SelectField
-            label="자산규모"
-            value={client.asset_size}
-            options={ASSET_SIZE_OPTIONS}
-            onChange={(v) => cField("asset_size", v)}
-          />
-          <SelectField
-            label="상장여부"
-            value={client.listing_status}
-            options={LISTING_OPTIONS}
-            onChange={(v) => cField("listing_status", v)}
-          />
-          {isAudit && (
-            <SelectField
-              label="사업보고서"
-              value={client.business_report}
-              options={BUSINESS_REPORT_OPTIONS}
-              onChange={(v) => cField("business_report", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="GAAP"
-              value={client.gaap}
-              options={GAAP_OPTIONS}
-              onChange={(v) => cField("gaap", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="연결재무제표"
-              value={client.consolidated}
-              options={CONSOLIDATED_OPTIONS}
-              onChange={(v) => cField("consolidated", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="연결자회사수"
-              value={client.subsidiary_count}
-              options={SUBSIDIARY_OPTIONS}
-              onChange={(v) => cField("subsidiary_count", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="내부회계관리제도"
-              value={client.internal_control}
-              options={INTERNAL_CONTROL_OPTIONS}
-              onChange={(v) => cField("internal_control", v)}
-            />
-          )}
-          {isAudit && (
-            <SelectField
-              label="초도/계속감사"
-              value={client.initial_audit}
-              options={AUDIT_TYPE_OPTIONS}
-              onChange={(v) => cField("initial_audit", v)}
-            />
-          )}
-        </div>
-      </section>
 
       {/* Project Search Modal */}
       {showProjectSearch && (
@@ -1521,19 +1430,19 @@ function Step1Form({
                 );
                 if (r.ok) {
                   const info = await r.json();
-                  const base = client; // snapshot before async — existing user input wins
-                  setClient({
-                    ...base,
-                    industry: base.industry || info.industry || "",
-                    asset_size: base.asset_size || info.asset_size || "",
-                    listing_status: base.listing_status || info.listing_status || "",
-                    business_report: base.business_report || info.business_report || "",
-                    gaap: base.gaap || info.gaap || "",
-                    consolidated: base.consolidated || info.consolidated || "",
-                    subsidiary_count: base.subsidiary_count || info.subsidiary_count || "",
-                    internal_control: base.internal_control || info.internal_control || "",
-                    initial_audit: base.initial_audit || info.initial_audit || "",
-                  });
+                  setClient((prev) => ({
+                    ...prev,
+                    client_code: code,
+                    industry: info.industry || "",
+                    asset_size: info.asset_size || "",
+                    listing_status: info.listing_status || "",
+                    business_report: info.business_report || "",
+                    gaap: info.gaap || "",
+                    consolidated: info.consolidated || "",
+                    subsidiary_count: info.subsidiary_count || "",
+                    internal_control: info.internal_control || "",
+                    initial_audit: info.initial_audit || "",
+                  }));
                 }
               } catch {
                 /* silent fail — client info autofill is best-effort */
@@ -1651,6 +1560,119 @@ function Step1Form({
         </div>
       </section>
 
+      {/* 클라이언트 기본정보 */}
+      <section>
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
+          <h3 className="text-sm font-bold text-pwc-black">
+            클라이언트 기본정보
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowClientSearch(true)}
+            className="px-3 py-1.5 text-xs font-medium border border-pwc-orange text-pwc-orange rounded hover:bg-pwc-orange hover:text-white transition-colors"
+          >
+            클라이언트 검색
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {!isAudit && (
+            <div className="col-span-full text-xs text-pwc-gray-600 bg-pwc-gray-50 rounded-md p-2 mb-3">
+              비감사 서비스는 표준산업분류 · 자산규모 · 상장여부 3가지 정보만 입력합니다.
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              Client Code
+            </label>
+            <input
+              type="text"
+              value={client.client_code}
+              onChange={(e) => cField("client_code", e.target.value)}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-pwc-gray-600 mb-1">
+              Client Name
+            </label>
+            <input
+              type="text"
+              value={client.client_name}
+              onChange={(e) => cField("client_name", e.target.value)}
+              readOnly
+              className="w-full px-2 py-1.5 text-sm border border-pwc-gray-100 rounded bg-pwc-gray-50 text-pwc-gray-600"
+            />
+          </div>
+          <SelectField
+            label="표준산업분류"
+            value={client.industry}
+            options={INDUSTRY_OPTIONS}
+            onChange={(v) => cField("industry", v)}
+          />
+          <SelectField
+            label="자산규모"
+            value={client.asset_size}
+            options={ASSET_SIZE_OPTIONS}
+            onChange={(v) => cField("asset_size", v)}
+          />
+          <SelectField
+            label="상장여부"
+            value={client.listing_status}
+            options={LISTING_OPTIONS}
+            onChange={(v) => cField("listing_status", v)}
+          />
+          {isAudit && (
+            <SelectField
+              label="사업보고서"
+              value={client.business_report}
+              options={BUSINESS_REPORT_OPTIONS}
+              onChange={(v) => cField("business_report", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="GAAP"
+              value={client.gaap}
+              options={GAAP_OPTIONS}
+              onChange={(v) => cField("gaap", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결재무제표"
+              value={client.consolidated}
+              options={CONSOLIDATED_OPTIONS}
+              onChange={(v) => cField("consolidated", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="연결자회사수"
+              value={client.subsidiary_count}
+              options={SUBSIDIARY_OPTIONS}
+              onChange={(v) => cField("subsidiary_count", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="내부회계관리제도"
+              value={client.internal_control}
+              options={INTERNAL_CONTROL_OPTIONS}
+              onChange={(v) => cField("internal_control", v)}
+            />
+          )}
+          {isAudit && (
+            <SelectField
+              label="초도/계속감사"
+              value={client.initial_audit}
+              options={AUDIT_TYPE_OPTIONS}
+              onChange={(v) => cField("initial_audit", v)}
+            />
+          )}
+        </div>
+      </section>
+
       {/* 시간 배분 */}
       <section>
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-pwc-gray-100">
@@ -1727,28 +1749,10 @@ function Step1Form({
               contractHours={project.contract_hours}
               min={0}
             />
-            <NumberField
-              label="Fulcrum 시간"
-              value={project.fulcrum_hours}
-              onChange={(v) => pField("fulcrum_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
-            <NumberField
-              label="RA-Staff 시간"
-              value={project.ra_staff_hours}
-              onChange={(v) => pField("ra_staff_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
-            <NumberField
-              label="Specialist 시간"
-              value={project.specialist_hours}
-              onChange={(v) => pField("specialist_hours", v)}
-              contractHours={project.contract_hours}
-              min={0}
-            />
           </div>
+          <p className="text-xs text-pwc-gray-600 italic mt-1">
+            ※ Fulcrum / RA-Staff / Specialist 시간은 Step 3 (Time Budget) 에서 분배 입력합니다.
+          </p>
         </div>
 
         {/* Group B: 기타 차감 항목 */}
