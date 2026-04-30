@@ -78,7 +78,7 @@ def upsert_project_from_client_data(db: Session, data: dict) -> Project:
     project.specialist_hours = data.get("specialist_hours", 0)
     project.travel_hours = data.get("travel_hours", 0)
     project.total_budget_hours = data.get("total_budget_hours", 0)
-    project.template_status = data.get("template_status", "")
+    project.template_status = data.get("template_status") or "작성중"
     if data.get("service_type"):
         project.service_type = data["service_type"]
 
