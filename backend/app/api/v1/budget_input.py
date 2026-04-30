@@ -248,15 +248,25 @@ def list_registered_projects(
 @router.get("/projects/search")
 def search_projects(q: str = "", client_code: str = "", db: Session = Depends(get_db)):
     """프로젝트 검색 — Azure DB(회사 전체) + PostgreSQL(Budget 등록 여부) 병합.
-    client_code가 주어지면 해당 클라이언트(프로젝트코드 앞 5자리)에 종속된 프로젝트만 반환.
-    Azure 연결 불가 시 PostgreSQL에 등록된 프로젝트를 fallback으로 반환.
+
+    client_code 가 주어지면 해당 클라이언트의 프로젝트만 반환.
+    legal entity client_code (예: 05319 삼성전자) 와 project_code 앞 5자리 (예: 00435)
+    가 서로 다른 코드 체계이므로, client_code → client_name 으로 변환 후 name-match 사용.
     """
     from app.services import azure_service
 
-    # 1) Azure에서 회사 전체 진행 중 프로젝트 검색
-    #    client_code가 있으면 해당 클라이언트의 프로젝트만 필터
+    # client_code → client_name 해석 (legal entity 코드를 Azure project name 매칭에 사용)
+    client_name = ""
+    client_id: int | None = None
+    if client_code:
+        c = db.query(Client).filter(Client.client_code == client_code).first()
+        if c:
+            client_name = (c.client_name or "").strip()
+            client_id = c.id
+
+    # 1) Azure에서 회사 전체 진행 중 프로젝트 검색 — client_name 으로 필터
     azure_results = azure_service.search_azure_projects(
-        q, limit=200, client_code_prefix=client_code
+        q, limit=200, client_name=client_name, client_code_prefix=client_code
     )
 
     def _pg_extra(p: "Project") -> dict:
@@ -321,7 +331,9 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
     # 3b) Azure 결과 없음 (연결 불가 or 필터 결과 0건) → PG 등록 프로젝트 fallback
     #     client_code 필터 적용, q로 검색 (case-insensitive)
     pg_query = db.query(Project)
-    if client_code:
+    if client_id is not None:
+        pg_query = pg_query.filter(Project.client_id == client_id)
+    elif client_code:
         prefix = client_code[:5]
         pg_query = pg_query.filter(Project.project_code.ilike(f"{prefix}%"))
     if q:
@@ -332,8 +344,7 @@ def search_projects(q: str = "", client_code: str = "", db: Session = Depends(ge
         )
     fallback_projects = pg_query.order_by(Project.project_code).limit(200).all()
 
-    # Also load client names via join
-    from app.models.project import Client
+    # Also load client names via join (Client already imported at module top)
     client_map: dict[int, str] = {}
     client_ids = [p.client_id for p in fallback_projects if p.client_id]
     if client_ids:
@@ -663,57 +674,6 @@ def get_project_info(project_code: str, db: Session = Depends(get_db)):
 # /members GET so that FastAPI does not swallow the sub-path as a
 # path-parameter match against {project_code}/members.
 
-@router.get("/projects/{project_code}/members/export")
-def export_project_members(
-    project_code: str,
-    user: dict = Depends(require_login),
-    db: Session = Depends(get_db),
-):
-    """Step 2 구성원 목록 Excel 다운로드.
-
-    NOTE: This route MUST be registered before the plain `/members` GET so
-    that FastAPI does not swallow `members/export` as a {project_code}
-    sub-path match.
-    """
-    from openpyxl import Workbook
-    from app.models.employee import Employee
-
-    members = (
-        db.query(ProjectMember)
-        .filter(ProjectMember.project_code == project_code)
-        .order_by(ProjectMember.sort_order, ProjectMember.id)
-        .all()
-    )
-
-    # Build empno → department lookup for team column
-    empnos = [m.empno for m in members if m.empno]
-    emp_dept: dict[str, str] = {}
-    if empnos:
-        emps = db.query(Employee).filter(Employee.empno.in_(empnos)).all()
-        emp_dept = {e.empno: (e.department or "") for e in emps}
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "구성원"
-    ws.append(["사번", "이름", "역할", "직급", "팀"])
-    for m in members:
-        dept = emp_dept.get(m.empno or "", "")
-        ws.append([m.empno or "", m.name or "", m.role or "FLDT", m.grade or "", dept])
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    # #78: RFC 5987 UTF-8 인코딩으로 한글 파일명 브라우저 호환성 보장
-    fn_members = quote(f"members_{project_code}.xlsx")
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{fn_members}",
-        },
-    )
-
-
 @router.get("/projects/{project_code}/members")
 def get_members(project_code: str, db: Session = Depends(get_db)):
     members = (
@@ -762,9 +722,6 @@ def save_members(
 
 # ── Step 3: Budget Template ──────────────────────────
 
-# Note: export/upload registered before plain /template so FastAPI does not
-# swallow `template/export` as a {project_code} sub-path match.
-
 def _build_12_months(fiscal_start) -> list[str]:
     """Return a list of 12 YYYY-MM strings starting from fiscal_start (date or 'YYYY-MM' str)."""
     import datetime as _dt
@@ -784,201 +741,6 @@ def _build_12_months(fiscal_start) -> list[str]:
         y = start_year + ((start_month - 1 + i) // 12)
         months.append(f"{y}-{m:02d}")
     return months
-
-
-@router.get("/projects/{project_code}/template/export")
-def export_project_template(
-    project_code: str,
-    user: dict = Depends(require_login),
-    db: Session = Depends(get_db),
-):
-    """Step 3 Time Budget Excel 다운로드.
-
-    #106: All 12 months always written (0 if no data).
-    #117: Rows sorted by budget_unit_master.sort_order then unit_name.
-    #75/#105: Reads latest committed state via fresh query.
-    """
-    from openpyxl import Workbook
-    from app.models.budget import BudgetDetail
-
-    # Refresh read from DB (#75/#105 — ensure latest committed state)
-    db.expire_all()
-
-    project = db.query(Project).filter(Project.project_code == project_code).first()
-
-    # Build 12-month column list from project's fiscal_start (#106)
-    fiscal_start = project.fiscal_start if project else None
-    months = _build_12_months(fiscal_start)
-
-    # Build sort_order lookup from BudgetUnitMaster (#117)
-    unit_sort: dict[str, int] = {}
-    master_rows = db.query(BudgetUnitMaster).order_by(BudgetUnitMaster.sort_order).all()
-    for m in master_rows:
-        unit_sort[m.unit_name] = m.sort_order
-    # Fallback sort_order for unknown units using DEFAULT_BUDGET_UNITS
-    for du in DEFAULT_BUDGET_UNITS:
-        if du["unit_name"] not in unit_sort:
-            unit_sort[du["unit_name"]] = du["sort_order"]
-
-    rows = (
-        db.query(BudgetDetail)
-        .filter(BudgetDetail.project_code == project_code)
-        .order_by(
-            BudgetDetail.budget_category,
-            BudgetDetail.budget_unit,
-            BudgetDetail.empno,
-            BudgetDetail.year_month,
-        )
-        .all()
-    )
-
-    pivot: dict[tuple, dict] = {}
-    name_by_empno: dict[str, str] = {}
-    grade_by_empno: dict[str, str] = {}
-    # Track insertion order for re-sorting later
-    key_order: list[tuple] = []
-    for r in rows:
-        key = (r.budget_category or "", r.budget_unit or "", r.empno or "")
-        if key not in pivot:
-            pivot[key] = {}
-            key_order.append(key)
-        pivot[key][r.year_month] = (pivot[key].get(r.year_month) or 0) + (r.budget_hours or 0)
-        if r.emp_name:
-            name_by_empno[r.empno or ""] = r.emp_name
-        if r.grade:
-            grade_by_empno[r.empno or ""] = r.grade
-
-    # Sort rows by sort_order then unit_name (#117)
-    key_order_sorted = sorted(
-        key_order,
-        key=lambda k: (unit_sort.get(k[1], 9999), k[1], k[2]),
-    )
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Time Budget"
-    # #106: All 12 months always present as columns
-    headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
-    ws.append(headers)
-    for key in key_order_sorted:
-        (cat, unit, emp) = key
-        month_hours = pivot[key]
-        row_data = [cat, unit, emp, name_by_empno.get(emp, ""), grade_by_empno.get(emp, "")]
-        for m in months:
-            row_data.append(month_hours.get(m, 0))  # 0 if no data for that month
-        ws.append(row_data)
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    # #78: RFC 5987 UTF-8 인코딩
-    fn_template = quote(f"template_{project_code}.xlsx")
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn_template}"},
-    )
-
-
-@router.post("/projects/{project_code}/template/upload")
-async def upload_project_template(
-    project_code: str,
-    file: UploadFile = File(...),
-    user: dict = Depends(require_elpm),
-    db: Session = Depends(get_db),
-):
-    """Step 3 Time Budget Excel 업로드 — merge 방식 (업로드된 행만 교체, 나머지 보존).
-
-    #107/#114: 업로드 파일의 (budget_unit, empno) 조합에 해당하는 기존 rows만 삭제 후
-    재삽입. 파일에 없는 rows는 삭제하지 않아 부분 업로드 후에도 나머지 데이터 보존.
-    """
-    from openpyxl import load_workbook
-    from app.models.budget import BudgetDetail
-    from app.api.deps import assert_can_modify_project
-    from fastapi import HTTPException
-
-    assert_can_modify_project(db, user, project_code)
-
-    content = await file.read()
-    wb = load_workbook(io.BytesIO(content), data_only=True)
-    ws = wb.active
-
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        return {"imported_count": 0, "skipped": [{"reason": "empty"}]}
-
-    headers = [str(h) if h is not None else "" for h in rows[0]]
-    base_cols = {"budget_category": -1, "budget_unit": -1, "empno": -1, "name": -1, "grade": -1}
-    month_cols: list[tuple[int, str]] = []
-    for idx, h in enumerate(headers):
-        h_clean = h.strip()
-        if h_clean in base_cols:
-            base_cols[h_clean] = idx
-        elif "-" in h_clean and len(h_clean) >= 7:
-            month_cols.append((idx, h_clean))
-
-    if base_cols["budget_unit"] == -1:
-        raise HTTPException(status_code=400, detail="헤더에 budget_unit 컬럼이 필요합니다.")
-
-    # Parse uploaded rows to identify which (unit, empno) keys are being replaced
-    parsed_rows: list[dict] = []
-    skipped: list[dict] = []
-    for ridx, row in enumerate(rows[1:], start=2):
-        if not row or not any(c is not None for c in row):
-            continue
-        cat = str(row[base_cols["budget_category"]]).strip() if base_cols["budget_category"] >= 0 and row[base_cols["budget_category"]] else ""
-        unit = str(row[base_cols["budget_unit"]]).strip() if row[base_cols["budget_unit"]] else ""
-        empno = str(row[base_cols["empno"]]).strip() if base_cols["empno"] >= 0 and row[base_cols["empno"]] else ""
-        name = str(row[base_cols["name"]]).strip() if base_cols["name"] >= 0 and row[base_cols["name"]] else ""
-        grade = str(row[base_cols["grade"]]).strip() if base_cols["grade"] >= 0 and row[base_cols["grade"]] else ""
-        if not unit:
-            skipped.append({"row": ridx, "reason": "budget_unit missing"})
-            continue
-        month_hours: dict[str, float] = {}
-        for col_idx, year_month in month_cols:
-            cell = row[col_idx] if col_idx < len(row) else None
-            try:
-                hours = float(cell or 0)
-            except (TypeError, ValueError):
-                hours = 0
-            if hours > 0:
-                month_hours[year_month] = hours
-        parsed_rows.append({
-            "budget_category": cat,
-            "budget_unit": unit,
-            "empno": empno,
-            "emp_name": name,
-            "grade": grade,
-            "months": month_hours,
-        })
-
-    # Merge: delete only the (budget_unit, empno) combos present in the upload file
-    # This preserves rows not included in the upload (#107/#114)
-    uploaded_keys: set[tuple[str, str]] = {(r["budget_unit"], r["empno"]) for r in parsed_rows}
-    for unit, empno in uploaded_keys:
-        db.query(BudgetDetail).filter(
-            BudgetDetail.project_code == project_code,
-            BudgetDetail.budget_unit == unit,
-            BudgetDetail.empno == empno,
-        ).delete(synchronize_session=False)
-
-    imported = 0
-    for prow in parsed_rows:
-        for year_month, hours in prow["months"].items():
-            db.add(BudgetDetail(
-                project_code=project_code,
-                budget_category=prow["budget_category"],
-                budget_unit=prow["budget_unit"],
-                empno=prow["empno"],
-                emp_name=prow["emp_name"],
-                grade=prow["grade"],
-                year_month=year_month,
-                budget_hours=hours,
-            ))
-            imported += 1
-
-    db.commit()
-    return {"imported_count": imported, "skipped": skipped}
 
 
 @router.get("/projects/{project_code}/template")
@@ -1273,152 +1035,3 @@ DEFAULT_BUDGET_UNITS = [
 ]
 
 
-# ── Step 2 구성원 Excel Upload ──────────────────
-
-
-@router.post("/projects/{project_code}/members/upload")
-async def upload_project_members(
-    project_code: str,
-    file: UploadFile = File(...),
-    user: dict = Depends(require_elpm),
-    db: Session = Depends(get_db),
-):
-    """Step 2 구성원 목록 Excel 업로드 — FLDT 구성원 truncate+insert."""
-    from openpyxl import load_workbook
-    from app.models.employee import Employee
-
-    assert_can_modify_project(db, user, project_code)
-
-    content = await file.read()
-    wb = load_workbook(io.BytesIO(content), data_only=True)
-    ws = wb.active
-
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
-
-    db.query(ProjectMember).filter(
-        ProjectMember.project_code == project_code,
-        ProjectMember.role == "FLDT",
-    ).delete(synchronize_session=False)
-    db.commit()
-
-    imported: list[dict] = []
-    skipped: list[dict] = []
-    errors: list[dict] = []
-    for idx, row in enumerate(rows):
-        row_num = idx + 2  # Excel row number (1-indexed header + 1)
-        if not row or not any(c is not None for c in row):
-            continue
-        empno = str(row[0]).strip() if row[0] else ""
-        name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-        role = str(row[2]).strip() if len(row) > 2 and row[2] else "FLDT"
-        # #73: 직급/팀 columns are optional — lookup from employees master if missing
-        grade = str(row[3]).strip() if len(row) > 3 and row[3] else None
-
-        if not empno:
-            # #87: accumulate errors per-row, do not stop
-            errors.append({"row": row_num, "col": "사번", "error": "사번 누락"})
-            skipped.append({"row": row_num, "reason": "empno missing"})
-            continue
-
-        emp = db.query(Employee).filter(Employee.empno == empno).first()
-        if emp is None:
-            errors.append({"row": row_num, "col": "사번", "error": f"사번 {empno} 직원 없음"})
-            skipped.append({"empno": empno, "reason": "not_found"})
-            continue
-        if emp.emp_status and emp.emp_status != "재직":
-            errors.append({"row": row_num, "col": "사번", "error": f"사번 {empno} 재직 아님 ({emp.emp_status})"})
-            skipped.append({"empno": empno, "reason": "inactive"})
-            continue
-
-        # #73: fill grade from employees master if column missing
-        resolved_grade = grade or (emp.grade_name or "")
-
-        db.add(ProjectMember(
-            project_code=project_code,
-            role=role,
-            name=name or emp.name,
-            empno=empno,
-            grade=resolved_grade,
-            sort_order=idx,
-        ))
-        imported.append({"empno": empno, "name": name or emp.name})
-
-    db.commit()
-    return {
-        "imported_count": len(imported),
-        "imported": imported,
-        "skipped": skipped,
-        "errors": errors,
-    }
-
-
-@router.get("/template/blank-export")
-def export_blank_budget_template(db: Session = Depends(get_db), user: dict = Depends(require_login)):
-    """비활성 상태에서도 받을 수 있는 빈 Budget Template Excel.
-    #119: budget_unit 열에 드롭다운 DataValidation 추가 (hidden sheet + named range 방식).
-    """
-    import datetime as _dt
-    from openpyxl import Workbook
-    from openpyxl.worksheet.datavalidation import DataValidation
-    from openpyxl.utils import quote_sheetname
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Time Budget"
-    base_year = _dt.datetime.now().year
-    months: list = []
-    for i in range(12):
-        m = ((4 - 1 + i) % 12) + 1
-        y = base_year + (1 if i >= 9 else 0)
-        months.append(f"{y}-{m:02d}")
-    headers = ["budget_category", "budget_unit", "empno", "name", "grade"] + months
-    ws.append(headers)
-    # Pre-populate 100 blank data rows so validation applies immediately
-    for _ in range(100):
-        ws.append([""] * len(headers))
-
-    # #119: build budget_unit dropdown via hidden sheet + named range
-    # (formula1 direct list is limited to 255 chars; named range avoids this)
-    unit_names: list[str] = []
-    try:
-        master_units = (
-            db.query(BudgetUnitMaster)
-            .order_by(BudgetUnitMaster.sort_order)
-            .all()
-        )
-        unit_names = [u.unit_name for u in master_units if u.unit_name]
-    except Exception:
-        pass  # DB unavailable — skip validation, template still usable
-
-    if unit_names:
-        # Write units to a hidden sheet
-        ws_lists = wb.create_sheet("_lists")
-        ws_lists.sheet_state = "hidden"
-        for i, name in enumerate(unit_names, start=1):
-            ws_lists.cell(row=i, column=1, value=name)
-        # Define a named range pointing to the lists sheet column A
-        last_row = len(unit_names)
-        ref = f"{quote_sheetname('_lists')}!$A$1:$A${last_row}"
-        from openpyxl.workbook.defined_name import DefinedName
-        dn = DefinedName("BudgetUnitList", attr_text=ref)
-        wb.defined_names.add(dn)
-        # Add DataValidation for column B (budget_unit), rows 2–101
-        dv = DataValidation(
-            type="list",
-            formula1="BudgetUnitList",
-            allow_blank=True,
-            showErrorMessage=False,
-        )
-        dv.sqref = "B2:B101"
-        ws.add_data_validation(dv)
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    # #78: RFC 5987 UTF-8 인코딩
-    fn_blank = quote("budget_template_blank.xlsx")
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn_blank}"},
-    )

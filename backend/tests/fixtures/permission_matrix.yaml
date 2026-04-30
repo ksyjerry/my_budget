@@ -110,38 +110,9 @@
     staff: 403
     anon: 401
 
-- method: POST
-  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/template/upload
-  guards: [require_elpm, assert_can_modify_project]
-  expected:
-    admin: 200
-    elpm: 200
-    staff: 403
-    anon: 401
-
 - method: PUT
   path: /api/v1/budget/projects/RT-AUDIT-MIN-001/template
   guards: [require_elpm, assert_can_modify_project]
-  expected:
-    admin: 200
-    elpm: 200
-    staff: 403
-    anon: 401
-
-- method: POST
-  path: /api/v1/budget/projects/RT-AUDIT-MIN-001/members/upload
-  guards: [require_elpm, assert_can_modify_project]
-  expected:
-    admin: 200
-    elpm: 200
-    staff: 403
-    anon: 401
-
-# ── /api/v1/budget/upload (budget_upload router) ────────────────────────────
-
-- method: POST
-  path: /api/v1/budget/upload
-  guards: [require_elpm]
   expected:
     admin: 200
     elpm: 200
