@@ -1,5 +1,6 @@
 import os
 from logging.config import fileConfig
+from pathlib import Path
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
@@ -17,9 +18,18 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# DATABASE_URL 환경변수가 설정되어 있으면 alembic.ini 의 sqlalchemy.url 를 override.
-# CI / Docker / production 환경에서는 환경변수 우선, local dev 는 alembic.ini fallback.
+# DATABASE_URL 우선순위:
+# 1) os.environ['DATABASE_URL'] (CI/Docker/production) — 가장 우선
+# 2) backend/.env 파일의 DATABASE_URL= 라인 (local dev)
+# 3) alembic.ini 의 sqlalchemy.url (fallback)
 _db_url = os.environ.get("DATABASE_URL")
+if not _db_url:
+    _env_file = Path(__file__).parent.parent / ".env"
+    if _env_file.exists():
+        for line in _env_file.read_text().splitlines():
+            if line.startswith("DATABASE_URL="):
+                _db_url = line.split("=", 1)[1].strip()
+                break
 if _db_url:
     config.set_main_option("sqlalchemy.url", _db_url)
 

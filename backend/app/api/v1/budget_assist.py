@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.api.deps import require_login
 from app.models.project import Project
 from app.models.budget import BudgetDetail
+from app.services.error_sanitize import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,7 +28,8 @@ class SuggestRequest(BaseModel):
     et_controllable: float
     enabled_units: list[dict]  # [{"category": "자산", "unit_name": "매출채권-일반"}, ...]
     members: list[dict]  # [{"empno": "...", "name": "...", "grade": "SA"}, ...]
-    client_info: dict = {}  # industry, asset_size, etc.
+    client_info: dict = {}  # industry, asset_size, initial_audit, service_type, etc.
+    service_type: str = "AUDIT"  # #76: 비감사 서비스 유형 (AUDIT/AC/IC/ESG/VAL/...)
 
 
 class SuggestResponse(BaseModel):
@@ -160,6 +162,37 @@ async def suggest_budget(
     client = _get_client()
     ref_data = _get_reference_data(db, req.project_code, req.client_info)
 
+    # #76: 비감사 서비스의 경우 service_task_master에서 해당 서비스의 task 목록 조회
+    service_type = req.service_type or req.client_info.get("service_type", "AUDIT")
+    service_tasks_desc = ""
+    if service_type != "AUDIT":
+        from app.models.project import ServiceTaskMaster
+        tasks = (
+            db.query(ServiceTaskMaster)
+            .filter(ServiceTaskMaster.service_type == service_type)
+            .order_by(ServiceTaskMaster.sort_order)
+            .all()
+        )
+        if tasks:
+            tasks_lines = "\n".join(
+                f"- [{t.task_category or ''}] {t.task_name}"
+                + (f" ({t.subcategory_name})" if t.subcategory_name else "")
+                for t in tasks
+            )
+            service_tasks_desc = f"""
+## 서비스 유형별 Task 마스터 ({service_type})
+※ 아래 task 목록은 "{service_type}" 서비스의 표준 관리단위입니다. enabled_units와 비교하여 배분하세요.
+{tasks_lines}
+"""
+
+    # #108: 계속감사 시 "초도감사" 관리단위 0시간 명시
+    initial_audit = req.client_info.get("initial_audit", "")
+    initial_audit_rule = ""
+    if initial_audit == "계속":
+        initial_audit_rule = "\n7. ※ 이 프로젝트는 계속감사입니다. '초도감사' 관리단위는 반드시 0시간으로 배정하라."
+    elif initial_audit == "초도":
+        initial_audit_rule = "\n7. ※ 이 프로젝트는 초도감사입니다. '계획단계' 및 '초도감사' 관리단위 비중을 높게 배정하라."
+
     units_list = "\n".join(
         f"- [{u['category']}] {u['unit_name']}"
         for u in req.enabled_units
@@ -176,7 +209,7 @@ async def suggest_budget(
         ensure_ascii=False,
     )
 
-    system_prompt = """너는 PwC Assurance 감사 Budget 배분 전문가이다.
+    system_prompt = f"""너는 PwC Assurance 감사 Budget 배분 전문가이다.
 
 프로젝트 정보와 유사 프로젝트 실적을 참고하여, 관리단위별 Budget 시간 배분을 추천하라.
 
@@ -186,24 +219,25 @@ async def suggest_budget(
 3. 각 관리단위에 최소 1시간 이상 배정 (해당 항목인 경우)
 4. 대분류별 비중이 합리적인지 확인
 5. 초도감사인 경우 계획단계 비중을 높게
-6. 금융업은 대출채권/유가증권 등 금융 특화 항목 비중 높게
+6. 금융업은 대출채권/유가증권 등 금융 특화 항목 비중 높게{initial_audit_rule}
 
 응답은 반드시 JSON으로:
-{
+{{
   "suggestions": [
-    {"category": "대분류", "unit_name": "관리단위", "hours": 숫자, "reason": "배정 근거"}
+    {{"category": "대분류", "unit_name": "관리단위", "hours": 숫자, "reason": "배정 근거"}}
   ],
   "summary": "전체 배분 요약 설명"
-}"""
+}}"""
 
     user_prompt = f"""## 프로젝트 정보
+- 서비스 유형: {service_type}
 - ET Controllable Budget: {req.et_controllable}시간
 - 산업: {req.client_info.get('industry', '미상')}
 - 자산규모: {req.client_info.get('asset_size', '미상')}
 - 상장여부: {req.client_info.get('listing_status', '미상')}
-- 감사유형: {req.client_info.get('initial_audit', '미상')}
+- 초도/계속 감사 구분: {initial_audit or '미상'}
 - 내부통제: {req.client_info.get('internal_control', '미상')}
-
+{service_tasks_desc}
 ## 배정 대상 관리단위 (enabled)
 {units_list}
 
@@ -228,7 +262,7 @@ async def suggest_budget(
         logger.error(f"Budget suggest LLM error: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=f"AI 추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+            detail=sanitize_error_message(f"AI 추천 생성에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__}: {e})"),
         )
 
     elapsed = int((time.time() - t0) * 1000)
@@ -327,7 +361,7 @@ async def validate_budget(
         logger.error(f"Budget validate LLM error: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=f"AI 검증에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__})",
+            detail=sanitize_error_message(f"AI 검증에 실패했습니다. 잠시 후 다시 시도해주세요. ({type(e).__name__}: {e})"),
         )
 
     elapsed = int((time.time() - t0) * 1000)

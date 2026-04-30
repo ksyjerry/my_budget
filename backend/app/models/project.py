@@ -59,6 +59,7 @@ class Project(Base):
     total_budget_hours = Column(Float, default=0)
     template_status = Column(String(50))
     fiscal_start = Column(Date)
+    fiscal_end = Column(Date, nullable=True)
     service_type = Column(String(20), default="AUDIT")
 
     created_at = Column(DateTime, server_default=func.now())
@@ -83,3 +84,4 @@ class ServiceTaskMaster(Base):
     budget_unit = Column(String(200))
     role = Column(String(100))
     source_file = Column(String(200))
+    subcategory_name = Column(String(255), nullable=True)
