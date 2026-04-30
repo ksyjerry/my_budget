@@ -21,7 +21,7 @@ class TestBudgetActualConsistency:
         assert "projects" in data
 
     def test_project_budget_is_contract_hours(self, client, elpm_cookie, db):
-        """프로젝트별 Budget이 contract_hours(총 계약시간)와 일치하는지."""
+        """프로젝트별 Budget이 (contract_hours - axdx_hours)와 일치하는지 (POL-01 (b))."""
         res = client.get("/api/v1/overview", cookies=elpm_cookie)
         data = res.json()
 
@@ -33,15 +33,17 @@ class TestBudgetActualConsistency:
         pc = proj["project_code"]
         api_budget = proj["budget"]
 
-        # DB에서 contract_hours 직접 조회
+        # POL-01 (b): Budget = contract_hours - axdx_hours
         result = db.execute(
-            text("SELECT COALESCE(contract_hours, 0) FROM projects WHERE project_code = :pc"),
+            text("SELECT COALESCE(contract_hours, 0), COALESCE(axdx_hours, 0) FROM projects WHERE project_code = :pc"),
             {"pc": pc},
         )
-        db_contract = float(result.scalar())
+        db_contract, db_axdx = result.fetchone()
+        expected = float(db_contract) - float(db_axdx)
 
-        assert abs(api_budget - db_contract) < 0.1, (
-            f"Project {pc}: API budget={api_budget}, DB contract_hours={db_contract}"
+        assert abs(api_budget - expected) < 0.1, (
+            f"Project {pc}: API budget={api_budget}, expected (contract-AXDX)={expected} "
+            f"(contract={db_contract}, AXDX={db_axdx})"
         )
 
     def test_budget_actual_same_scope(self, client, elpm_cookie):
