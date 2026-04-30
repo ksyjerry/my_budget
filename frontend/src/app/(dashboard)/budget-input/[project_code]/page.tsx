@@ -1272,7 +1272,7 @@ function Step1Form({
   project: ProjectInfo;
   setProject: (p: ProjectInfo) => void;
   client: ClientInfo;
-  setClient: (c: ClientInfo) => void;
+  setClient: React.Dispatch<React.SetStateAction<ClientInfo>>;
   etControllable: number;
   isNew: boolean;
   onCloneFromProject: (projectCode: string) => void;
